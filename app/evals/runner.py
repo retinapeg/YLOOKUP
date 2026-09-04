@@ -1,4 +1,4 @@
-"""Reproducible end-to-end evaluation runner for FundOps Control Room."""
+"""Reproducible end-to-end evaluation runner for FundOps Copilot."""
 
 from __future__ import annotations
 

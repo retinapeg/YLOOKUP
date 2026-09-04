@@ -496,7 +496,7 @@ def _render_sidebar() -> None:
         st.markdown(
             """
             <div class="rail-brand">
-              <div class="mark">FUNDOPS / CONTROL ROOM</div>
+              <div class="mark">FUNDOPS / COPILOT</div>
               <h2>Case utilities</h2>
               <p>Load the canonical demo cases or process a single text-based notice.</p>
             </div>
