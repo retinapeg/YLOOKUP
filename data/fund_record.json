@@ -1,0 +1,13 @@
+{
+  "case_id": "northstar-growth-fund-ii-albion-call-04",
+  "fund_name": "Northstar Growth Fund II",
+  "investor_name": "Albion Capital Partners",
+  "commitment_amount": "5000000.00",
+  "capital_call_amount": "625000.00",
+  "call_date": "2026-09-04",
+  "due_date": "2026-09-18",
+  "currency": "GBP",
+  "bank_account_reference": "NSGFII-ALB-CC04",
+  "management_fee": "25000.00",
+  "document_type": "CAPITAL_CALL"
+}

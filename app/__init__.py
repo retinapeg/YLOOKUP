@@ -1,0 +1,1 @@
+"""FundOps Copilot application package."""
