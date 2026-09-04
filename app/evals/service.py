@@ -48,7 +48,11 @@ def frontend_evaluation_summary(
 
     report = load_evaluation_results(path)
     summary = report["summary"]
-    extraction = summary["extraction"]["exact_normalized_field_accuracy"]
+    mode = str(report["run"]["mode"])
+    pipeline_extraction = summary["extraction"][
+        "exact_normalized_field_accuracy"
+    ]
+    model_subset = summary.get("model_success_subset")
     exception = summary["exception_detection"]["field_level"]
     rules = summary["reconciliation"]["isolated_rule_correctness"][
         "rule_correctness"
@@ -56,14 +60,41 @@ def frontend_evaluation_summary(
     reviewer = summary["reviewer"]
     return {
         "label": summary["label"],
+        "mode": mode,
         "generated_at": report["generated_at"],
         "dataset": {
             "id": report["dataset"]["id"],
             "schema_version": report["dataset"]["schema_version"],
+            "sha256": report["dataset"]["sha256"],
             "synthetic": report["dataset"]["synthetic"],
         },
         "sample_size": summary["sample_size"],
-        "extraction_accuracy": extraction,
+        "pipeline_extraction": {
+            "scope": (
+                "full_hybrid_pipeline_including_deterministic_fill_ins"
+                if mode == "model"
+                else "deterministic_fixture_pipeline"
+            ),
+            "exact_normalized_field_accuracy": pipeline_extraction,
+        },
+        "model_origin_extraction": (
+            {
+                "scope": "grounded_fields_with_openai_compatible_provenance_only",
+                "exact_normalized_field_accuracy": model_subset["extraction"][
+                    "exact_normalized_field_accuracy"
+                ],
+                "all_labelled_field_coverage": model_subset[
+                    "all_labelled_field_coverage"
+                ],
+                "gold_present_field_coverage": model_subset[
+                    "gold_present_field_coverage"
+                ],
+                "sample_documents": model_subset["sample_documents"],
+                "labelled_fields": model_subset["labelled_fields"],
+            }
+            if mode == "model" and isinstance(model_subset, Mapping)
+            else None
+        ),
         "exception_precision": exception["precision"],
         "exception_recall": exception["recall"],
         "exception_f1": exception["f1"],
@@ -71,6 +102,9 @@ def frontend_evaluation_summary(
         "reviewer": reviewer,
         "operating": {
             "documents": summary["operating"]["documents"],
+            "model_field_provenance": summary["operating"][
+                "model_field_provenance"
+            ],
             "latency_ms": summary["operating"]["latency_ms"]["total"],
             "model_calls": summary["operating"]["model_calls"],
             "token_usage": summary["operating"]["token_usage"],

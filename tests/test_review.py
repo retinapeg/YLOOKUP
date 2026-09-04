@@ -104,6 +104,42 @@ def test_correct_evidence_is_supported_without_overwriting_reconciliation():
     assert report.model_dump(mode="json") == original
 
 
+def test_optional_null_pass_does_not_require_source_evidence_or_human_review():
+    item = ReconciliationItem(
+        field="management_fee",
+        expected=None,
+        observed=None,
+        status=ReconciliationStatus.PASS,
+        severity=Severity.NONE,
+        explanation="No value is expected and none is present in the document",
+        provenance=None,
+    )
+
+    finding = review_reconciliation(_report(item)).findings[0]
+
+    assert finding.status is ReviewStatus.SUPPORTED
+    assert finding.confidence is None
+    assert finding.requires_human_review is False
+    assert "not applicable" in finding.review_reason.casefold()
+
+
+def test_required_missing_value_still_requires_evidence_and_human_review():
+    item = ReconciliationItem(
+        field="management_fee",
+        expected=Decimal("25000"),
+        observed=None,
+        status=ReconciliationStatus.MISSING,
+        severity=Severity.HIGH,
+        explanation="Expected value is missing from the document",
+        provenance=None,
+    )
+
+    finding = review_reconciliation(_report(item)).findings[0]
+
+    assert finding.status is ReviewStatus.INSUFFICIENT_EVIDENCE
+    assert finding.requires_human_review is True
+
+
 def test_unsupported_extraction_creates_grounded_challenge():
     # Reconciliation says PASS, but the independent evidence says 150,000.
     item = _item(

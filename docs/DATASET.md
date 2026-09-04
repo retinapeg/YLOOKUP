@@ -4,8 +4,8 @@ This corpus contains entirely fictional institutional investors, funds, notices,
 
 ## Dataset layout
 
-- `data/fund_record.json` and `data/sample_documents/` support the one-click Northstar/Albion MVP flow.
-- `data/demo/northstar_growth_fund_ii/` is the polished two-page Northstar package with its LP register, canonical record, notice, and case-level gold label.
+- `data/demo/northstar_growth_fund_ii/` is the one-click flagship: a polished two-page Northstar package with its LP register, canonical record, notice, and case-level gold label.
+- `data/fund_record.json` and `data/sample_documents/` provide the compact Albion clean-match and parser regression fixtures.
 - `data/evals/investor_register.csv` and `.xlsx` hold canonical register rows for the evaluation cases.
 - `data/evals/notices/` contains text fixtures. Form-feed characters delimit pages.
 - `data/gold/capital_call_reconciliation.json` is the authoritative machine-readable manifest; its companion schema documents the stable envelope.
@@ -52,12 +52,12 @@ Each case contains all ten canonical reconciliation fields, per-field expected/o
 
 ## Northstar demo package
 
-The extended benchmark package reconciles Alderstone Civic Pension Partnership against Northstar Growth Fund II Call 04. It is separate from the primary Albion one-click demo and exists only for evaluator stress testing. The register expects GBP 625,000 due 30 September 2026. The notice states GBP 650,000 due 28 September 2026, while all other canonical fields agree. Page 2 includes a settled GBP 500,000 prior call as a deliberately stale distractor.
+The flagship package reconciles Alderstone Civic Pension Partnership against Northstar Growth Fund II Call 04 and is also gold case `CC-002`. The register expects GBP 625,000 due 30 September 2026. The notice states GBP 650,000 due 28 September 2026, while all other canonical fields agree. Page 2 includes a settled GBP 500,000 prior call as a deliberately stale distractor.
 
-The separate one-click MVP case uses Albion Capital Partners and follows the primary product brief: GBP 5,000,000 commitment, GBP 625,000 expected call, and 18 September 2026 due date. Its discrepancy notice changes only the call amount to GBP 650,000 and due date to 20 September 2026.
+The compact Albion fixtures retain a GBP 5,000,000 commitment, GBP 625,000 expected call, and 18 September 2026 due date. They provide a clean matching notice plus a minimal discrepancy regression notice.
 
 ## Regeneration and validation
 
-Run `python scripts/generate_gold_dataset.py`, then `node scripts/generate_investor_workbooks.mjs`, then `python scripts/generate_fixture_pdfs.py` using environments that provide the documented artifact dependencies. Run `pytest -q` to validate schema shape, cross-file references, evidence locators, register parity, duplicate declarations, financial invariants, and replayable reconciliation labels.
+Run `python scripts/generate_gold_dataset.py`, then `node scripts/generate_investor_workbooks.mjs`, then `python scripts/generate_fixture_pdfs.py` using environments that provide the documented artifact dependencies. Run `python -m pytest -q` to validate schema shape, cross-file references, evidence locators, register parity, duplicate declarations, financial invariants, and replayable reconciliation labels.
 
 Do not use these fixtures for payment, onboarding, sanctions screening, tax reporting, or any real investor workflow.

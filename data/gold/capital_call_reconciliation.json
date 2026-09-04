@@ -3,7 +3,7 @@
   "dataset_id": "fundops-private-markets-capital-call-v1",
   "dataset_name": "FundOps private-markets capital-call gold corpus",
   "synthetic": true,
-  "generated_for": "FundOps Copilot",
+  "generated_for": "FundOps Control Room",
   "as_of_date": "2026-09-04",
   "null_semantics": "Present null means labelled missing, ambiguous, or conflicting; omitted means unlabelled.",
   "reconciliation_fields": [

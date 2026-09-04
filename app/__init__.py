@@ -1,1 +1,1 @@
-"""FundOps Copilot application package."""
+"""FundOps Control Room application package."""

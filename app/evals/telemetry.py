@@ -7,7 +7,10 @@ import time
 from typing import Any, Dict, Mapping, Optional, Union
 from urllib import request
 
-from app.extraction import OpenAICompatibleExtractor
+from app.extraction import (
+    OPENAI_EXTRACTION_SYSTEM_PROMPT,
+    OpenAICompatibleExtractor,
+)
 
 
 def _token_count(usage: Mapping[str, Any], *names: str) -> Optional[int]:
@@ -75,11 +78,7 @@ class InstrumentedOpenAIExtractor(OpenAICompatibleExtractor):
                         "messages": [
                             {
                                 "role": "system",
-                                "content": (
-                                    "Extract fields only; do not reconcile or judge them. "
-                                    "Return JSON with document_type and a fields object. Each "
-                                    "field must include value, page, confidence, and evidence."
-                                ),
+                                "content": OPENAI_EXTRACTION_SYSTEM_PROMPT,
                             },
                             {"role": "user", "content": prompt},
                         ],

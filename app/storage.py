@@ -42,7 +42,12 @@ class AuditStore:
                     document_id TEXT NOT NULL DEFAULT 'unspecified'
                         CHECK (length(trim(document_id)) > 0),
                     source_document TEXT,
+                    source_location TEXT,
                     field TEXT NOT NULL CHECK (length(trim(field)) > 0),
+                    expected_value TEXT,
+                    observed_value TEXT,
+                    difference TEXT,
+                    reviewer_status TEXT,
                     decision TEXT NOT NULL CHECK (
                         decision IN ('APPROVED', 'NEEDS_INVESTIGATION', 'REJECTED')
                     ),
@@ -86,6 +91,17 @@ class AuditStore:
                 connection.execute(
                     "ALTER TABLE audit_events ADD COLUMN source_document TEXT"
                 )
+            for column in (
+                "source_location",
+                "expected_value",
+                "observed_value",
+                "difference",
+                "reviewer_status",
+            ):
+                if column not in columns:
+                    connection.execute(
+                        f"ALTER TABLE audit_events ADD COLUMN {column} TEXT"
+                    )
             connection.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_audit_events_document_field_time
@@ -112,16 +128,22 @@ class AuditStore:
                 """
                 INSERT INTO audit_events
                     (
-                        case_id, document_id, source_document, field,
-                        decision, created_at, note, actor
+                        case_id, document_id, source_document, source_location,
+                        field, expected_value, observed_value, difference,
+                        reviewer_status, decision, created_at, note, actor
                     )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     clean_case_id,
                     clean_document_id,
                     event.source_document,
+                    event.source_location,
                     clean_field,
+                    event.expected_value,
+                    event.observed_value,
+                    event.difference,
+                    event.reviewer_status,
                     clean_decision,
                     event_time.isoformat(),
                     clean_note,
@@ -135,7 +157,12 @@ class AuditStore:
             case_id=clean_case_id,
             document_id=clean_document_id,
             source_document=event.source_document,
+            source_location=event.source_location,
             field=clean_field,
+            expected_value=event.expected_value,
+            observed_value=event.observed_value,
+            difference=event.difference,
+            reviewer_status=event.reviewer_status,
             decision=ReviewDecision(clean_decision),
             created_at=event_time,
             note=clean_note,
@@ -150,6 +177,11 @@ class AuditStore:
         *,
         document_id: str = "unspecified",
         source_document: str | None = None,
+        source_location: str | None = None,
+        expected_value: str | None = None,
+        observed_value: str | None = None,
+        difference: str | None = None,
+        reviewer_status: str | None = None,
         note: str | None = None,
         actor: str = "Reviewer",
         created_at: datetime | None = None,
@@ -161,7 +193,12 @@ class AuditStore:
                 case_id=case_id,
                 document_id=document_id,
                 source_document=source_document,
+                source_location=source_location,
                 field=field,
+                expected_value=expected_value,
+                observed_value=observed_value,
+                difference=difference,
+                reviewer_status=reviewer_status,
                 decision=ReviewDecision(_normalize_decision(decision)),
                 note=note,
                 actor=actor,
@@ -232,6 +269,11 @@ def record_decision(
     *,
     document_id: str = "unspecified",
     source_document: str | None = None,
+    source_location: str | None = None,
+    expected_value: str | None = None,
+    observed_value: str | None = None,
+    difference: str | None = None,
+    reviewer_status: str | None = None,
     note: str | None = None,
     actor: str = "Reviewer",
     created_at: datetime | None = None,
@@ -245,6 +287,11 @@ def record_decision(
         decision,
         document_id=document_id,
         source_document=source_document,
+        source_location=source_location,
+        expected_value=expected_value,
+        observed_value=observed_value,
+        difference=difference,
+        reviewer_status=reviewer_status,
         note=note,
         actor=actor,
         created_at=created_at,
@@ -315,7 +362,32 @@ def _row_to_entry(row: sqlite3.Row) -> AuditEvent:
             if row["source_document"] is not None
             else None
         ),
+        source_location=(
+            str(row["source_location"])
+            if row["source_location"] is not None
+            else None
+        ),
         field=str(row["field"]),
+        expected_value=(
+            str(row["expected_value"])
+            if row["expected_value"] is not None
+            else None
+        ),
+        observed_value=(
+            str(row["observed_value"])
+            if row["observed_value"] is not None
+            else None
+        ),
+        difference=(
+            str(row["difference"])
+            if row["difference"] is not None
+            else None
+        ),
+        reviewer_status=(
+            str(row["reviewer_status"])
+            if row["reviewer_status"] is not None
+            else None
+        ),
         decision=ReviewDecision(str(row["decision"])),
         created_at=_as_utc(datetime.fromisoformat(str(row["created_at"]))),
         note=str(row["note"]) if row["note"] is not None else None,

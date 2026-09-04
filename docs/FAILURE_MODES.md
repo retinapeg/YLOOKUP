@@ -1,6 +1,6 @@
 # Failure modes
 
-FundOps Copilot fails closed at input and persistence boundaries, and surfaces uncertain extraction as reviewable workflow state. A failed or partial operation must never be presented as completed.
+FundOps Control Room fails closed at input and persistence boundaries, and surfaces uncertain extraction as reviewable workflow state. A failed or partial operation must never be presented as completed.
 
 | Failure | Detection | User behaviour | System behaviour | Recovery |
 |---|---|---|---|---|
@@ -12,12 +12,12 @@ FundOps Copilot fails closed at input and persistence boundaries, and surfaces u
 | AI service is unavailable | Credentials are absent, connection fails, or provider returns an availability error | Show a warning that deterministic extraction was used | Fall back to deterministic extraction and attach a warning; if no safe fallback exists, return `503 ai_unavailable` | Continue with the fallback or retry the provider later |
 | AI response is invalid | JSON parsing and typed schema validation fail | Show that AI output was not trusted | Discard the response, retain no fabricated fields, and fall back; otherwise return `502 ai_invalid_response` | Continue with deterministic results or retry |
 | AI request times out | The configured provider deadline expires | Show a timeout warning while preserving the current case | Cancel/abandon the provider call and fall back; otherwise return `504 ai_timeout` | Continue with deterministic results or retry later |
-| Duplicate record or repeated submission | A stable case/business key or idempotency check matches existing data | Surface the duplicate for review; never silently overwrite | Preserve both source evidence and existing state; return `409 duplicate_record` where the operation cannot proceed | Select the intended record or submit with a corrected identifier |
+| Duplicate record or repeated submission | **Not implemented in the current single-document UI**; the synthetic corpus contains a labelled duplicate case | Do not claim automatic duplicate protection in the MVP | Production design: compare stable business keys and document hashes, preserve both sources, and return `409 duplicate_record` rather than overwrite | Add batch context and an idempotency store before production use |
 | Audit/database write fails | SQLite transaction, constraint, lock, or disk error | State clearly that the decision was **not saved** | Roll back atomically, leave prior audit state unchanged, and return `503 audit_write_failed` | Retry after storage is available; verify the event appears once |
 
 ## Error and health contract
 
-HTTP-facing errors use the status above and a small stable envelope:
+The domain errors carry status codes and a small stable envelope so a future HTTP API can expose them consistently:
 
 ```json
 {
@@ -32,10 +32,10 @@ HTTP-facing errors use the status above and a small stable envelope:
 }
 ```
 
-The Streamlit UI presents a safe message and reference ID rather than a traceback. Its lightweight liveness endpoint is `/_stcore/health`; `200` means the Streamlit process is responding, not that the AI provider or every uploaded document is healthy. Dependency failures are reported on the affected request instead of making liveness depend on an optional provider.
+The current Streamlit UI does not return this envelope over an application API; it presents a safe message and reference ID rather than a traceback. Streamlit's lightweight liveness endpoint is `/_stcore/health`; `200` means the Streamlit process is responding, not that the AI provider or every uploaded document is healthy. Dependency failures are reported on the affected request instead of making liveness depend on an optional provider.
 
 ## Logging and audit
 
 The optional observability helper can emit structured JSON stage logs with `request_id`, `workflow_stage`, `duration_ms`, and `success`/`failure`, plus a safe error code on failure. It accepts only a fixed metadata schema so document text, prompts, credentials, and provider bodies cannot be logged accidentally. The current local Streamlit workflow does not enable stage logging by default.
 
-Human decisions are append-only in normal application flow. Every audit event contains an ID, timezone-aware timestamp, case and document identifiers, source document, actor, decision, field, and reason. A new decision appends an event; it never edits the extracted source or an earlier event. Database update/delete guards provide a second line of enforcement, and a failed audit write is not reflected as saved in the UI.
+Human decisions are append-only in normal application flow. Every new audit event contains an ID, timezone-aware timestamp, case and package identifiers, source document and location, field, expected/observed/difference snapshots, evidence-review status, actor, decision, and reason. The package identifier is a SHA-256 digest over source bytes, the canonical record, and the completed extraction. A new decision appends an event; it never edits the extracted source or an earlier event. SQLite update/delete/replace guards provide a second line of enforcement, and a failed audit write is not reflected as saved in the UI. This is not a claim of a cryptographically immutable external ledger.

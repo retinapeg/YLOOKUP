@@ -1,4 +1,4 @@
-"""Reproducible end-to-end evaluation runner for FundOps Copilot."""
+"""Reproducible end-to-end evaluation runner for FundOps Control Room."""
 
 from __future__ import annotations
 
@@ -614,6 +614,7 @@ def _reviewer_metrics(
 def _operating_metrics(
     config: EvaluationConfig,
     case_results: Sequence[Mapping[str, Any]],
+    field_rows: Sequence[FieldObservation],
     extractor: Any,
 ) -> Dict[str, Any]:
     snapshots = _snapshot(extractor)
@@ -621,10 +622,28 @@ def _operating_metrics(
     successful_cases = sum(result["pipeline_status"] == "SUCCESS" for result in case_results)
     fallback_cases = sum(result["pipeline_status"] == "FALLBACK" for result in case_results)
     failed_cases = sum(result["pipeline_status"] == "ERROR" for result in case_results)
-    model_success_cases = sum(
-        result.get("extraction_method") == "OPENAI_COMPATIBLE"
+    model_method = str(_value(ExtractionMethod.OPENAI_COMPATIBLE))
+    rows_by_case: Dict[str, List[FieldObservation]] = {}
+    for row in field_rows:
+        rows_by_case.setdefault(row.case_id, []).append(row)
+    model_origin_rows = [row for row in field_rows if row.method == model_method]
+    model_output_case_ids = {row.case_id for row in model_origin_rows}
+    complete_model_case_ids = {
+        str(result["case_id"])
         for result in case_results
-    )
+        if (case_rows := rows_by_case.get(str(result["case_id"]), []))
+        and any(not is_missing(row.expected) for row in case_rows)
+        and all(
+            row.method == model_method
+            or (is_missing(row.expected) and is_missing(row.observed))
+            for row in case_rows
+        )
+    }
+    model_success_cases = len(complete_model_case_ids)
+    gold_present_rows = [row for row in field_rows if not is_missing(row.expected)]
+    model_gold_present_rows = [
+        row for row in gold_present_rows if row.method == model_method
+    ]
     configuration_failure_documents = sum(
         result.get("configuration_failure", False) for result in case_results
     )
@@ -744,7 +763,28 @@ def _operating_metrics(
             "coverage": rate(successful_cases, total_cases),
             "model_successful": model_success_cases,
             "model_coverage": rate(model_success_cases, total_cases),
+            "model_partial": len(model_output_case_ids - complete_model_case_ids),
+            "model_no_output": total_cases - len(model_output_case_ids),
+            "model_coverage_definition": (
+                "A document counts only when every gold-present labelled field and "
+                "every observed labelled field has OPENAI_COMPATIBLE provenance. "
+                "Correct abstentions on gold-missing fields do not require provenance."
+            ),
             "configuration_failure_documents": configuration_failure_documents,
+        },
+        "model_field_provenance": {
+            "model_origin_fields": len(model_origin_rows),
+            "all_labelled_field_coverage": rate(
+                len(model_origin_rows), len(field_rows)
+            ),
+            "gold_present_model_origin_fields": len(model_gold_present_rows),
+            "gold_present_field_coverage": rate(
+                len(model_gold_present_rows), len(gold_present_rows)
+            ),
+            "documents_with_any_model_field": rate(
+                len(model_output_case_ids), total_cases
+            ),
+            "method": model_method,
         },
         "latency_ms": latency,
         "model_calls": model_calls,
@@ -780,6 +820,7 @@ def _regression_gates(
         "high_severity_exception_recall"
     ]
     api_failures = operations["model_calls"].get("api_failures")
+    model_call_count = operations["model_calls"].get("count")
     gates = [
         {
             "name": "all_documents_completed_without_fallback",
@@ -809,7 +850,7 @@ def _regression_gates(
             "required_maximum": 0,
         },
     ]
-    if api_failures is not None:
+    if api_failures is not None and model_call_count:
         gates.append(
             {
                 "name": "api_failures_are_zero",
@@ -941,10 +982,11 @@ def run_evaluation(
         model_fallback = bool(
             config.mode == "model" and realized_method != "OPENAI_COMPATIBLE"
         )
+        source_fallback = realized_method == "FALLBACK"
         pipeline_failed = document is None or model_fallback
         if document is None:
             pipeline_status = "ERROR"
-        elif model_fallback:
+        elif source_fallback or model_fallback:
             pipeline_status = "FALLBACK"
         else:
             pipeline_status = "SUCCESS"
@@ -1146,21 +1188,19 @@ def run_evaluation(
     all_failures = _build_failures(
         field_rows, status_rows, case_methods, reviewer_rows
     )
-    operating = _operating_metrics(config, case_results, selected_extractor)
+    operating = _operating_metrics(
+        config, case_results, field_rows, selected_extractor
+    )
 
-    successful_model_ids = {
-        result["case_id"]
-        for result in case_results
-        if result.get("extraction_method") == "OPENAI_COMPATIBLE"
-    }
-    model_success_rows = [
-        row for row in field_rows if row.case_id in successful_model_ids
-    ]
-    confidence = calibration_metrics(field_rows)
+    model_method = str(_value(ExtractionMethod.OPENAI_COMPATIBLE))
+    model_success_rows = [row for row in field_rows if row.method == model_method]
+    successful_model_ids = {row.case_id for row in model_success_rows}
+    confidence_rows = model_success_rows if config.mode == "model" else field_rows
+    confidence = calibration_metrics(confidence_rows)
     confidence["confidence_kind"] = (
         "deterministic heuristic"
         if config.mode == "fixture"
-        else "model-reported on successful model outputs only"
+        else "model-reported on grounded model-origin fields only"
     )
 
     gold_missing = sum(is_missing(row.expected) for row in field_rows)
@@ -1186,7 +1226,18 @@ def run_evaluation(
             {
                 "extraction": extraction_metrics(model_success_rows),
                 "sample_documents": len(successful_model_ids),
-                "note": "Fallback documents are excluded from this subset and remain failures end to end.",
+                "labelled_fields": len(model_success_rows),
+                "all_labelled_field_coverage": operating[
+                    "model_field_provenance"
+                ]["all_labelled_field_coverage"],
+                "gold_present_field_coverage": operating[
+                    "model_field_provenance"
+                ]["gold_present_field_coverage"],
+                "note": (
+                    "Conditional accuracy on grounded fields with model provenance. "
+                    "Deterministic fill-ins and fallback documents are excluded here; "
+                    "the top-level extraction metrics score the full hybrid pipeline."
+                ),
             }
             if config.mode == "model"
             else None

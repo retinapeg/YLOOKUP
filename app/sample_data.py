@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Tuple
 
-from app.extraction import extract_document
+from app.extraction import Extractor, extract_document
 from app.models import ExtractedDocument, FundRecord, ReconciliationReport
 from app.reconciliation import reconcile_document
 
@@ -15,10 +15,23 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
 FUND_RECORD_PATH = DATA_DIR / "fund_record.json"
 SAMPLE_DOCUMENTS_DIR = DATA_DIR / "sample_documents"
+NORTHSTAR_PACKAGE_DIR = DATA_DIR / "demo" / "northstar_growth_fund_ii"
 
 DEMO_FILES = {
     "matching": SAMPLE_DOCUMENTS_DIR / "matching_capital_call.pdf",
-    "discrepancy": SAMPLE_DOCUMENTS_DIR / "discrepancy_capital_call.pdf",
+    "discrepancy": NORTHSTAR_PACKAGE_DIR / "capital_call_notice.pdf",
+}
+DEMO_RECORD_FILES = {
+    "matching": FUND_RECORD_PATH,
+    "discrepancy": NORTHSTAR_PACKAGE_DIR / "expected_canonical_record.json",
+}
+DEMO_REGISTER_FILES = {
+    "matching": DATA_DIR / "evals" / "investor_register.xlsx",
+    "discrepancy": NORTHSTAR_PACKAGE_DIR / "investor_register.xlsx",
+}
+DEMO_REGISTER_CELLS = {
+    "matching": {"capital_call_amount": "LP Register!I2", "due_date": "LP Register!M2"},
+    "discrepancy": {"capital_call_amount": "LP Register!I2", "due_date": "LP Register!M2"},
 }
 
 
@@ -29,6 +42,8 @@ def load_fund_record(path: Path = FUND_RECORD_PATH) -> FundRecord:
 
 def load_demo_case(
     case: str = "discrepancy",
+    *,
+    extractor: Extractor | None = None,
 ) -> Tuple[FundRecord, ExtractedDocument, ReconciliationReport]:
     """Load, extract, and reconcile one complete offline demo case."""
 
@@ -36,10 +51,21 @@ def load_demo_case(
         choices = ", ".join(sorted(DEMO_FILES))
         raise ValueError("unknown demo case; choose one of: {}".format(choices))
 
-    record = load_fund_record()
-    document = extract_document(DEMO_FILES[case], case_id=record.case_id)
+    record = load_fund_record(DEMO_RECORD_FILES[case])
+    document = extract_document(
+        DEMO_FILES[case],
+        extractor=extractor,
+        case_id=record.case_id,
+    )
     report = reconcile_document(record, document)
     return record, document, report
 
 
-__all__ = ["DEMO_FILES", "load_demo_case", "load_fund_record"]
+__all__ = [
+    "DEMO_FILES",
+    "DEMO_RECORD_FILES",
+    "DEMO_REGISTER_CELLS",
+    "DEMO_REGISTER_FILES",
+    "load_demo_case",
+    "load_fund_record",
+]

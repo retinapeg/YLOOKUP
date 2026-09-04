@@ -151,14 +151,19 @@ def print_summary(report: Mapping[str, Any], output_path: Path) -> None:
     ]
     operations = summary["operating"]
     total_latency = operations["latency_ms"]["total"]
-    print(f"FundOps AI evaluation — {summary['label']}")
+    print(f"FundOps evaluation — {summary['label']}")
     print(
         f"Sample: n={sample['selected_cases']} documents, "
         f"{sample['labelled_extraction_fields']} labelled fields; "
         f"{sample['replayable_reconciliation_cases']} reconciliation-replayable cases"
     )
+    extraction_label = (
+        "Hybrid pipeline extraction"
+        if report["run"]["mode"] == "model"
+        else "Extraction"
+    )
     print(
-        "Extraction: exact normalized "
+        f"{extraction_label}: exact normalized "
         + _metric(extraction["exact_normalized_field_accuracy"])
         + "; numeric "
         + _metric(extraction["numeric_accuracy"])
@@ -167,6 +172,14 @@ def print_summary(report: Mapping[str, Any], output_path: Path) -> None:
         + "; abstention "
         + _metric(extraction["missing_abstention"]["correct_abstention_rate"])
     )
+    if report["run"]["mode"] == "model":
+        model_subset = summary["model_success_subset"]
+        print(
+            "Model-origin fields: coverage "
+            + _metric(model_subset["all_labelled_field_coverage"])
+            + "; conditional exact normalized "
+            + _metric(model_subset["extraction"]["exact_normalized_field_accuracy"])
+        )
     print(
         "Exceptions: precision "
         + _metric(exception["precision"])
@@ -248,11 +261,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 2
     print_summary(report, args.output)
     if args.mode == "model":
-        coverage = report["summary"]["operating"]["documents"]["model_coverage"]
+        coverage = report["summary"]["operating"]["model_field_provenance"][
+            "all_labelled_field_coverage"
+        ]
         if coverage["numerator"] == 0:
             print(
-                "model evaluation produced no genuine model outputs; deterministic "
-                "fallbacks were excluded from model quality",
+                "model evaluation produced no grounded fields with model provenance; "
+                "deterministic fallbacks and fill-ins were excluded from model quality",
                 file=sys.stderr,
             )
             return 2

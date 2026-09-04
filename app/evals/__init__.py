@@ -1,4 +1,4 @@
-"""FundOps AI quality benchmark service."""
+"""FundOps quality benchmark service."""
 
 from .runner import (
     DEFAULT_OUTPUT_PATH,

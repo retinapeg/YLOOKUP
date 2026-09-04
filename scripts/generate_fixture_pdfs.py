@@ -76,7 +76,7 @@ def _draw_chrome(canvas: Canvas, label: str, page_number: int) -> float:
     canvas.line(LEFT, 42, RIGHT, 42)
     canvas.setFillColor(HexColor("#64748B"))
     canvas.setFont("Helvetica", 7.5)
-    canvas.drawString(LEFT, 28, "FundOps Copilot synthetic corpus | No bank coordinates are included")
+    canvas.drawString(LEFT, 28, "FundOps Control Room synthetic corpus | No bank coordinates are included")
     canvas.drawRightString(RIGHT, 28, f"Page {page_number}")
     return PAGE_HEIGHT - 116
 
@@ -136,8 +136,8 @@ def generate_pdf(source: Path, destination: Path, label: str) -> None:
         pageCompression=1,
         invariant=1,
     )
-    canvas.setAuthor("FundOps Copilot Synthetic Corpus")
-    canvas.setCreator("FundOps Copilot fixture generator")
+    canvas.setAuthor("FundOps Control Room Synthetic Corpus")
+    canvas.setCreator("FundOps Control Room fixture generator")
     canvas.setTitle(f"{label.title()} Capital Call Notice")
     canvas.setSubject("Entirely fictional private-markets reconciliation fixture")
 

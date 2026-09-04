@@ -27,6 +27,11 @@ def test_record_and_list_events_newest_first(tmp_path):
         AuditEvent(
             case_id="case-1",
             field="capital_call_amount",
+            source_location="PDF page 2",
+            expected_value="625000.00",
+            observed_value="650000.00",
+            difference="25000.00",
+            reviewer_status="SUPPORTED / DETERMINISTIC FIXTURE",
             decision=ReviewDecision.APPROVED,
             note="Checked against notice",
             created_at=older,
@@ -43,6 +48,11 @@ def test_record_and_list_events_newest_first(tmp_path):
     assert [event.id for event in events] == [second.id, first.id]
     assert events[0].decision is ReviewDecision.NEEDS_INVESTIGATION
     assert events[1].note == "Checked against notice"
+    assert events[1].source_location == "PDF page 2"
+    assert events[1].expected_value == "625000.00"
+    assert events[1].observed_value == "650000.00"
+    assert events[1].difference == "25000.00"
+    assert events[1].reviewer_status == "SUPPORTED / DETERMINISTIC FIXTURE"
 
 
 def test_latest_decision_is_scoped_to_case_and_field(tmp_path):
@@ -168,4 +178,6 @@ def test_existing_audit_database_is_migrated_without_losing_events(tmp_path):
     assert len(events) == 1
     assert events[0].document_id == "unspecified"
     assert events[0].source_document is None
+    assert events[0].expected_value is None
+    assert events[0].reviewer_status is None
     assert events[0].created_at.tzinfo is timezone.utc

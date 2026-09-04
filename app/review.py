@@ -973,16 +973,29 @@ def review_item(
     report = ReconciliationReport.model_validate(report)
     item = ReconciliationItem.model_validate(item)
     review_request = build_review_request(report, item)
-    try:
-        assessment = reviewer.assess(review_request)
-        assessment = ReviewAssessment.model_validate(assessment)
-    except Exception:
+    if (
+        item.status is ReconciliationStatus.PASS
+        and item.expected is None
+        and item.observed is None
+    ):
         assessment = ReviewAssessment(
-            status=ReviewStatus.NOT_REVIEWED,
+            status=ReviewStatus.SUPPORTED,
             review_reason=(
-                "Independent reviewer failed; no evidence review was completed."
+                "No value is expected or observed, so this optional field is not "
+                "applicable and needs no source evidence."
             ),
         )
+    else:
+        try:
+            assessment = reviewer.assess(review_request)
+            assessment = ReviewAssessment.model_validate(assessment)
+        except Exception:
+            assessment = ReviewAssessment(
+                status=ReviewStatus.NOT_REVIEWED,
+                review_reason=(
+                    "Independent reviewer failed; no evidence review was completed."
+                ),
+            )
 
     references = [
         ReviewSourceReference(
