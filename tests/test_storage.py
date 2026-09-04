@@ -80,6 +80,16 @@ def test_database_rejects_update_and_delete(tmp_path):
         with pytest.raises(sqlite3.IntegrityError, match="append-only"):
             connection.execute("DELETE FROM audit_events WHERE id = ?", (event.id,))
 
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO audit_events
+                    (id, case_id, document_id, field, decision, created_at, actor)
+                VALUES (?, 'case-1', 'unspecified', 'due_date', 'APPROVED', ?, 'attacker')
+                """,
+                (event.id, datetime.now(timezone.utc).isoformat()),
+            )
+
     assert [entry.id for entry in store.list_events()] == [event.id]
 
 
@@ -101,3 +111,61 @@ def test_list_events_honors_limit(tmp_path):
 
     with pytest.raises(ValueError, match="positive integer"):
         store.list_events(limit=0)
+
+
+def test_document_scoping_prevents_cross_document_decision_leaks(tmp_path):
+    store = AuditStore(tmp_path / "audit.db")
+    first = store.record_decision(
+        "case-1",
+        "due_date",
+        "APPROVED",
+        document_id="sha256:first",
+        source_document="first.pdf",
+    )
+    store.record_decision(
+        "case-1",
+        "due_date",
+        "REJECTED",
+        document_id="sha256:second",
+        source_document="second.pdf",
+    )
+
+    assert store.list_events(
+        case_id="case-1", document_id="sha256:first"
+    ) == [first]
+    assert store.latest_decision(
+        "case-1", "due_date", document_id="sha256:first"
+    ) == first
+
+
+def test_existing_audit_database_is_migrated_without_losing_events(tmp_path):
+    db_path = tmp_path / "legacy.db"
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE audit_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                case_id TEXT NOT NULL,
+                field TEXT NOT NULL,
+                decision TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                note TEXT,
+                actor TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO audit_events
+                (case_id, field, decision, created_at, note, actor)
+            VALUES ('case-1', 'due_date', 'APPROVED', ?, 'legacy', 'Reviewer')
+            """,
+            (datetime(2026, 9, 4, 9, 0).isoformat(),),
+        )
+
+    events = AuditStore(db_path).list_events()
+
+    assert len(events) == 1
+    assert events[0].document_id == "unspecified"
+    assert events[0].source_document is None
+    assert events[0].created_at.tzinfo is timezone.utc

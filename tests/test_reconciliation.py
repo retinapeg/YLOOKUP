@@ -106,6 +106,21 @@ def test_missing_required_field_is_flagged():
     assert result.severity is Severity.HIGH
 
 
+def test_not_available_marker_is_treated_as_missing():
+    report = reconcile_document(_record(), _document(due_date="N/A"))
+
+    assert _by_field(report, "due_date").status is ReconciliationStatus.MISSING
+
+
+@pytest.mark.parametrize("value", ["NaN", "Infinity", "-Infinity"])
+def test_non_finite_amount_requires_review_instead_of_raising(value):
+    report = reconcile_document(_record(), _document(capital_call_amount=value))
+
+    result = _by_field(report, "capital_call_amount")
+    assert result.status is ReconciliationStatus.REVIEW
+    assert "number" in result.explanation
+
+
 def test_equal_low_confidence_value_requires_review():
     document = _document()
     document.fields["fund_name"] = _field(

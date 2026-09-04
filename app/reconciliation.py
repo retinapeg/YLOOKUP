@@ -39,7 +39,12 @@ _FIELD_SEVERITY: dict[str, Severity] = {
 
 
 def _is_missing(value: FieldValue) -> bool:
-    return value is None or (isinstance(value, str) and not value.strip())
+    if value is None:
+        return True
+    if not isinstance(value, str):
+        return False
+    normalized = " ".join(value.split()).casefold()
+    return normalized in {"", "n/a", "na", "not available", "not provided", "—", "-"}
 
 
 def _normalize_text(value: object) -> str:
@@ -60,7 +65,10 @@ def _as_decimal(value: object) -> Decimal:
     cleaned = str(value).strip().replace(",", "")
     for token in ("GBP", "USD", "EUR", "£", "$", "€"):
         cleaned = cleaned.replace(token, "").replace(token.lower(), "")
-    return Decimal(cleaned.strip())
+    result = Decimal(cleaned.strip())
+    if not result.is_finite():
+        raise InvalidOperation("monetary values must be finite")
+    return result
 
 
 def _as_date(value: object) -> date:

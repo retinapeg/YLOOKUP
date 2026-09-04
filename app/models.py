@@ -164,6 +164,8 @@ class AuditEvent(DomainModel):
 
     id: Optional[int] = None
     case_id: str = Field(min_length=1)
+    document_id: str = Field(default="unspecified", min_length=1)
+    source_document: Optional[str] = None
     field: str = Field(min_length=1)
     decision: ReviewDecision
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
