@@ -1,0 +1,23 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Longfield Lower Mid-Market IV
+CAPITAL CALL NOTICE
+Notice ID: CC-025-NOTICE-A
+
+Fund Name: Longfield Lower Mid-Market IV
+Investor Name: Amberwick Pension Reserve
+Commitment Amount: GBP 5,000,000.00
+Capital Call Amount: GBP 700,000.00
+Call Date: 2026-09-04
+Due Date: 2026-09-28
+Currency: GBP
+Payment Reference: LLMM4-APR-CC09
+Document Type: Capital Call
+
+Operational context
+The notice matches the expected call record, but GBP 700,000 exceeds the GBP 625,000 uncalled balance before the drawdown.
+Remaining uncalled commitment before this notice: GBP 625,000.00
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

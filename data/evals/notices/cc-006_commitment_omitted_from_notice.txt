@@ -1,0 +1,21 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Redwood Arc Ventures III
+CAPITAL CALL NOTICE
+Notice ID: CC-006-NOTICE-A
+
+Fund Name: Redwood Arc Ventures III
+Investor Name: Ashcombe University Endowment
+Capital Call Amount: GBP 360,000.00
+Call Date: 2026-09-04
+Due Date: 2026-09-24
+Currency: GBP
+Payment Reference: RAV3-AUE-CC05
+Document Type: Capital Call
+
+Operational context
+The administrator register contains the commitment, but the capital-call notice never states it.
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

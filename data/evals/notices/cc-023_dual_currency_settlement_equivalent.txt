@@ -1,0 +1,23 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Bluehaven Digital Infrastructure II
+CAPITAL CALL NOTICE
+Notice ID: CC-023-NOTICE-A
+
+Fund Name: Bluehaven Digital Infrastructure II
+Investor Name: Fairwater Municipal Superannuation Pool
+Commitment Amount: USD 32,000,000.00
+Capital Call Amount: USD 800,000.00
+Call Date: 2026-09-04
+Due Date: 2026-09-30
+Currency: USD
+Payment Reference: BDI2-FMS-CC05
+Document Type: Capital Call
+
+Operational context
+The legal call is USD 800,000; GBP 625,000 is clearly labelled as a settlement equivalent at a locked rate.
+GBP settlement equivalent at locked rate: GBP 625,000.00
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

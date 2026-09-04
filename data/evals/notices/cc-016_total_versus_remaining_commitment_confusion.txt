@@ -1,0 +1,23 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Ironwood Mid-Market Fund IV
+CAPITAL CALL NOTICE
+Notice ID: CC-016-NOTICE-A
+
+Fund Name: Ironwood Mid-Market Fund IV
+Investor Name: Westhaven Educational Trust
+Total Commitment: GBP 12,500,000.00
+Capital Call Amount: GBP 500,000.00
+Call Date: 2026-09-04
+Due Date: 2026-09-29
+Currency: GBP
+Payment Reference: IMMF4-WET-CC07
+Document Type: Capital Call
+
+Operational context
+The notice labels the GBP 12.5m remaining commitment as total commitment; the legal commitment is GBP 20m.
+Uncalled amount before Call 07: GBP 12,500,000.00
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

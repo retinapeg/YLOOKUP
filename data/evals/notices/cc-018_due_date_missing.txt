@@ -1,0 +1,22 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Crown Mere Technology Fund II
+CAPITAL CALL NOTICE
+Notice ID: CC-018-NOTICE-A
+
+Fund Name: Crown Mere Technology Fund II
+Investor Name: Penford Civic Retirement Trust
+Commitment Amount: GBP 8,000,000.00
+Capital Call Amount: GBP 200,000.00
+Call Date: 2026-09-04
+Currency: GBP
+Payment Reference: CMT2-PCR-CC04
+Document Type: Capital Call
+
+Operational context
+The notice asks the LP to pay promptly but contains no calendar due date.
+Settlement instruction: Please remit promptly after internal approval.
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

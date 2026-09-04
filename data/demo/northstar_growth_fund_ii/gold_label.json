@@ -1,0 +1,387 @@
+{
+  "case_id": "CC-002",
+  "title": "Northstar flagship multi-field exception",
+  "description": "A polished two-page notice overstates Call 04 by GBP 25,000 and advances the due date by two days; a settled prior-call amount is retained as stale context.",
+  "difficulty": "ADVERSARIAL",
+  "scenario_types": [
+    "amount_mismatch",
+    "date_mismatch",
+    "stale_previous_call",
+    "polished_demo"
+  ],
+  "replayable_against_current_reconciler": true,
+  "register_ref": {
+    "csv": "data/demo/northstar_growth_fund_ii/investor_register.csv",
+    "xlsx": "data/demo/northstar_growth_fund_ii/investor_register.xlsx",
+    "record_id": "NSG2-REC-001",
+    "sheet": "LP Register"
+  },
+  "documents": [
+    {
+      "document_id": "DOC-CC-002-A",
+      "path": "data/demo/northstar_growth_fund_ii/capital_call_notice.txt",
+      "format": "txt",
+      "notice_id": "NORTHSTAR-ALDERSTONE-CALL-04",
+      "disposition": "CURRENT",
+      "duplicate_of": null,
+      "pages": 2,
+      "sha256": "20986981a851421ca57e505b20b5ae974fd11d70cdab5a438e343d202ab97e32"
+    }
+  ],
+  "canonical_record": {
+    "case_id": "CC-002",
+    "fund_name": "Northstar Growth Fund II",
+    "investor_name": "Alderstone Civic Pension Partnership",
+    "commitment_amount": "25000000.00",
+    "capital_call_amount": "625000.00",
+    "call_date": "2026-09-04",
+    "due_date": "2026-09-30",
+    "currency": "GBP",
+    "bank_account_reference": "NSGFII-ALD-CC04",
+    "management_fee": "25000.00",
+    "document_type": "CAPITAL_CALL"
+  },
+  "expected_extraction": {
+    "canonical_values": {
+      "fund_name": "Northstar Growth Fund II",
+      "investor_name": "Alderstone Civic Pension Partnership",
+      "commitment_amount": "25000000.00",
+      "capital_call_amount": "650000.00",
+      "call_date": "2026-09-04",
+      "due_date": "2026-09-28",
+      "currency": "GBP",
+      "bank_account_reference": "NSGFII-ALD-CC04",
+      "management_fee": "25000.00",
+      "document_type": "CAPITAL_CALL"
+    },
+    "null_reasons": {},
+    "field_evidence": {
+      "fund_name": [
+        {
+          "evidence_id": "CC-002-fund_name-1",
+          "field": "fund_name",
+          "source_kind": "document",
+          "source_file": "data/demo/northstar_growth_fund_ii/capital_call_notice.txt",
+          "document_id": "DOC-CC-002-A",
+          "locator": {
+            "page": 1,
+            "line_start": 7,
+            "line_end": 7
+          },
+          "raw_text": "Fund Name: Northstar Growth Fund II",
+          "normalized_value": "Northstar Growth Fund II",
+          "authority": "CURRENT"
+        }
+      ],
+      "investor_name": [
+        {
+          "evidence_id": "CC-002-investor_name-1",
+          "field": "investor_name",
+          "source_kind": "document",
+          "source_file": "data/demo/northstar_growth_fund_ii/capital_call_notice.txt",
+          "document_id": "DOC-CC-002-A",
+          "locator": {
+            "page": 1,
+            "line_start": 8,
+            "line_end": 8
+          },
+          "raw_text": "Investor Name: Alderstone Civic Pension Partnership",
+          "normalized_value": "Alderstone Civic Pension Partnership",
+          "authority": "CURRENT"
+        }
+      ],
+      "commitment_amount": [
+        {
+          "evidence_id": "CC-002-commitment_amount-1",
+          "field": "commitment_amount",
+          "source_kind": "document",
+          "source_file": "data/demo/northstar_growth_fund_ii/capital_call_notice.txt",
+          "document_id": "DOC-CC-002-A",
+          "locator": {
+            "page": 1,
+            "line_start": 9,
+            "line_end": 9
+          },
+          "raw_text": "Commitment Amount: GBP 25,000,000.00",
+          "normalized_value": "25000000.00",
+          "authority": "CURRENT"
+        }
+      ],
+      "capital_call_amount": [
+        {
+          "evidence_id": "CC-002-capital_call_amount-1",
+          "field": "capital_call_amount",
+          "source_kind": "document",
+          "source_file": "data/demo/northstar_growth_fund_ii/capital_call_notice.txt",
+          "document_id": "DOC-CC-002-A",
+          "locator": {
+            "page": 1,
+            "line_start": 10,
+            "line_end": 10
+          },
+          "raw_text": "Capital Call Amount: GBP 650,000.00",
+          "normalized_value": "650000.00",
+          "authority": "CURRENT"
+        }
+      ],
+      "call_date": [
+        {
+          "evidence_id": "CC-002-call_date-1",
+          "field": "call_date",
+          "source_kind": "document",
+          "source_file": "data/demo/northstar_growth_fund_ii/capital_call_notice.txt",
+          "document_id": "DOC-CC-002-A",
+          "locator": {
+            "page": 1,
+            "line_start": 12,
+            "line_end": 12
+          },
+          "raw_text": "Call Date: 2026-09-04",
+          "normalized_value": "2026-09-04",
+          "authority": "CURRENT"
+        }
+      ],
+      "due_date": [
+        {
+          "evidence_id": "CC-002-due_date-1",
+          "field": "due_date",
+          "source_kind": "document",
+          "source_file": "data/demo/northstar_growth_fund_ii/capital_call_notice.txt",
+          "document_id": "DOC-CC-002-A",
+          "locator": {
+            "page": 1,
+            "line_start": 13,
+            "line_end": 13
+          },
+          "raw_text": "Due Date: 2026-09-28",
+          "normalized_value": "2026-09-28",
+          "authority": "CURRENT"
+        }
+      ],
+      "currency": [
+        {
+          "evidence_id": "CC-002-currency-1",
+          "field": "currency",
+          "source_kind": "document",
+          "source_file": "data/demo/northstar_growth_fund_ii/capital_call_notice.txt",
+          "document_id": "DOC-CC-002-A",
+          "locator": {
+            "page": 1,
+            "line_start": 14,
+            "line_end": 14
+          },
+          "raw_text": "Currency: GBP",
+          "normalized_value": "GBP",
+          "authority": "CURRENT"
+        }
+      ],
+      "bank_account_reference": [
+        {
+          "evidence_id": "CC-002-bank_account_reference-1",
+          "field": "bank_account_reference",
+          "source_kind": "document",
+          "source_file": "data/demo/northstar_growth_fund_ii/capital_call_notice.txt",
+          "document_id": "DOC-CC-002-A",
+          "locator": {
+            "page": 1,
+            "line_start": 15,
+            "line_end": 15
+          },
+          "raw_text": "Payment Reference: NSGFII-ALD-CC04",
+          "normalized_value": "NSGFII-ALD-CC04",
+          "authority": "CURRENT"
+        }
+      ],
+      "management_fee": [
+        {
+          "evidence_id": "CC-002-management_fee-1",
+          "field": "management_fee",
+          "source_kind": "document",
+          "source_file": "data/demo/northstar_growth_fund_ii/capital_call_notice.txt",
+          "document_id": "DOC-CC-002-A",
+          "locator": {
+            "page": 1,
+            "line_start": 11,
+            "line_end": 11
+          },
+          "raw_text": "Management Fee: GBP 25,000.00",
+          "normalized_value": "25000.00",
+          "authority": "CURRENT"
+        }
+      ],
+      "document_type": [
+        {
+          "evidence_id": "CC-002-document_type-1",
+          "field": "document_type",
+          "source_kind": "document",
+          "source_file": "data/demo/northstar_growth_fund_ii/capital_call_notice.txt",
+          "document_id": "DOC-CC-002-A",
+          "locator": {
+            "page": 1,
+            "line_start": 6,
+            "line_end": 6
+          },
+          "raw_text": "Document Type: Capital Call",
+          "normalized_value": "CAPITAL_CALL",
+          "authority": "CURRENT"
+        }
+      ]
+    },
+    "distractors": [
+      {
+        "evidence_id": "CC-002-DISTRACTOR-1",
+        "field": "capital_call_amount",
+        "source_kind": "document",
+        "source_file": "data/demo/northstar_growth_fund_ii/capital_call_notice.txt",
+        "document_id": "DOC-CC-002-A",
+        "locator": {
+          "page": 2,
+          "line_start": 16,
+          "line_end": 16
+        },
+        "raw_text": "Call 03 - 2026-04-17 - GBP 500,000.00 - settled",
+        "normalized_value": "500000.00",
+        "authority": "STALE",
+        "reason": "Settled prior-call amount is historical context, not the current amount due."
+      }
+    ],
+    "candidates": {},
+    "warnings": []
+  },
+  "expected_reconciliation": {
+    "overall_status": "MISMATCH",
+    "case_severity": "HIGH",
+    "exception_fields": [
+      "capital_call_amount",
+      "due_date"
+    ],
+    "exception_codes": [
+      "CAPITAL_CALL_AMOUNT_MISMATCH",
+      "DUE_DATE_MISMATCH"
+    ],
+    "counts": {
+      "PASS": 8,
+      "MISMATCH": 2,
+      "MISSING": 0,
+      "REVIEW": 0
+    },
+    "field_results": {
+      "fund_name": {
+        "expected": "Northstar Growth Fund II",
+        "observed": "Northstar Growth Fund II",
+        "status": "PASS",
+        "severity": "NONE",
+        "difference": null,
+        "exception_code": null,
+        "evidence_ids": [
+          "CC-002-fund_name-1"
+        ]
+      },
+      "investor_name": {
+        "expected": "Alderstone Civic Pension Partnership",
+        "observed": "Alderstone Civic Pension Partnership",
+        "status": "PASS",
+        "severity": "NONE",
+        "difference": null,
+        "exception_code": null,
+        "evidence_ids": [
+          "CC-002-investor_name-1"
+        ]
+      },
+      "commitment_amount": {
+        "expected": "25000000.00",
+        "observed": "25000000.00",
+        "status": "PASS",
+        "severity": "NONE",
+        "difference": "0.00",
+        "exception_code": null,
+        "evidence_ids": [
+          "CC-002-commitment_amount-1"
+        ]
+      },
+      "capital_call_amount": {
+        "expected": "625000.00",
+        "observed": "650000.00",
+        "status": "MISMATCH",
+        "severity": "HIGH",
+        "difference": "25000.00",
+        "exception_code": "CAPITAL_CALL_AMOUNT_MISMATCH",
+        "evidence_ids": [
+          "CC-002-capital_call_amount-1"
+        ]
+      },
+      "call_date": {
+        "expected": "2026-09-04",
+        "observed": "2026-09-04",
+        "status": "PASS",
+        "severity": "NONE",
+        "difference": 0,
+        "exception_code": null,
+        "evidence_ids": [
+          "CC-002-call_date-1"
+        ]
+      },
+      "due_date": {
+        "expected": "2026-09-30",
+        "observed": "2026-09-28",
+        "status": "MISMATCH",
+        "severity": "HIGH",
+        "difference": -2,
+        "exception_code": "DUE_DATE_MISMATCH",
+        "evidence_ids": [
+          "CC-002-due_date-1"
+        ]
+      },
+      "currency": {
+        "expected": "GBP",
+        "observed": "GBP",
+        "status": "PASS",
+        "severity": "NONE",
+        "difference": null,
+        "exception_code": null,
+        "evidence_ids": [
+          "CC-002-currency-1"
+        ]
+      },
+      "bank_account_reference": {
+        "expected": "NSGFII-ALD-CC04",
+        "observed": "NSGFII-ALD-CC04",
+        "status": "PASS",
+        "severity": "NONE",
+        "difference": null,
+        "exception_code": null,
+        "evidence_ids": [
+          "CC-002-bank_account_reference-1"
+        ]
+      },
+      "management_fee": {
+        "expected": "25000.00",
+        "observed": "25000.00",
+        "status": "PASS",
+        "severity": "NONE",
+        "difference": "0.00",
+        "exception_code": null,
+        "evidence_ids": [
+          "CC-002-management_fee-1"
+        ]
+      },
+      "document_type": {
+        "expected": "CAPITAL_CALL",
+        "observed": "CAPITAL_CALL",
+        "status": "PASS",
+        "severity": "NONE",
+        "difference": null,
+        "exception_code": null,
+        "evidence_ids": [
+          "CC-002-document_type-1"
+        ]
+      }
+    },
+    "additional_results": {}
+  },
+  "reviewer_label": {
+    "requires_human_review": true,
+    "recommended_action": "HOLD_AND_INVESTIGATE",
+    "rationale": "At least one high-severity control requires evidence-backed human review."
+  }
+}

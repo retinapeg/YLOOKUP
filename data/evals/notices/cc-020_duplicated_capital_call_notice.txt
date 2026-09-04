@@ -1,0 +1,22 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Granite Reach Infrastructure III
+CAPITAL CALL NOTICE
+Notice ID: CC-020-NOTICE-A
+
+Fund Name: Granite Reach Infrastructure III
+Investor Name: Pinecross Community Endowment
+Commitment Amount: GBP 9,000,000.00
+Capital Call Amount: GBP 225,000.00
+Call Date: 2026-09-04
+Due Date: 2026-09-27
+Currency: GBP
+Payment Reference: GRI3-PCE-CC05
+Document Type: Capital Call
+
+Operational context
+Two files carry the same notice ID and identical capital-call content; each document passes alone, but the batch must be held as a duplicate.
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

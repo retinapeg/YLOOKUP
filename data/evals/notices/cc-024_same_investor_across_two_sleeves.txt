@@ -1,0 +1,24 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Cedar Arc Climate Partners I
+CAPITAL CALL NOTICE
+Notice ID: CC-024-NOTICE-A
+
+Fund Name: Cedar Arc Climate Partners I
+Investor Name: Glenhaven Public Pension Partnership
+Commitment Amount: GBP 10,000,000.00
+Capital Call Amount: GBP 250,000.00
+Call Date: 2026-09-04
+Due Date: 2026-09-25
+Currency: GBP
+Payment Reference: CACP1-GPP-B-CC02
+Document Type: Capital Call
+
+Operational context
+Two register rows share the same legal entity, but the notice includes the LP account ID that selects Sleeve B.
+LP Account ID: CACP1-LP-072-B
+Investment sleeve: Institutional Sleeve B
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

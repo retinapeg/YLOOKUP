@@ -1,0 +1,22 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Harbourlight Secondaries IV
+CAPITAL CALL NOTICE
+Notice ID: CC-004-NOTICE-A
+
+Fund Name: Harbourlight Secondaries IV
+Investor Name: Calder Fen Borough Retirement Scheme
+Commitment Amount: GBP 18,000,000.00
+Capital Call Amount: GBP 450,000.00
+Notice Date: 30 September 2026
+Payment Due: 22 October 2026
+Currency: GBP
+Payment Reference: HS4-CFB-CC09
+Document Type: Capital Call
+
+Operational context
+The notice date is correct, but settlement is requested seven days later than the administrator record.
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

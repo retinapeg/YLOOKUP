@@ -1,0 +1,23 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Silver Quay Buyout V
+CAPITAL CALL NOTICE
+Notice ID: CC-008-NOTICE-A
+
+Fund Name: Silver Quay Buyout V
+Investor Name: Larkspur County Pension Partnership
+Commitment Amount: GBP 12,000,000.00
+Call Date: 2026-09-04
+Due Date: 2026-09-23
+Currency: GBP
+Payment Reference: SQB5-LCP-CC08
+Document Type: Capital Call
+
+Operational context
+The notice states only 2.50% of commitment; GBP 300,000 is derivable but no explicit call amount appears.
+Capital Call Percentage: 2.50% of total commitment
+Derived amount for review only: GBP 300,000.00
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

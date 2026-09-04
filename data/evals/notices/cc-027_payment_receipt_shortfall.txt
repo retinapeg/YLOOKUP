@@ -1,0 +1,22 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Windermere Strategic Credit II
+CAPITAL CALL NOTICE
+Notice ID: CC-027-NOTICE-A
+
+Fund Name: Windermere Strategic Credit II
+Investor Name: Fallowmere County Retirement Fund
+Commitment Amount: GBP 10,000,000.00
+Capital Call Amount: GBP 625,000.00
+Call Date: 2026-09-04
+Due Date: 2026-09-30
+Currency: GBP
+Payment Reference: WSC2-FCR-CC06
+Document Type: Capital Call
+
+Operational context
+The notice and register agree at GBP 625,000, but the associated receipt records GBP 624,980, leaving GBP 20 unresolved.
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

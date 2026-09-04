@@ -1,0 +1,22 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Juniper Ridge Private Credit III
+CAPITAL CALL NOTICE
+Notice ID: CC-003-NOTICE-A
+
+Fund Name: Juniper Ridge Private Credit III
+Investor Name: Wrenford Mutual Assurance Pool
+Commitment Amount: USD 10,000,000.00
+Capital Call Amount: USD 625,000.00
+Call Date: 2026-09-04
+Due Date: 2026-09-25
+Currency: USD
+Payment Reference: JRPC3-WRE-CC06
+Document Type: Capital Call
+
+Operational context
+The numeric amount matches, but the notice denominates the call in USD while the fund record requires GBP.
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

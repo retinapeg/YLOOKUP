@@ -1,0 +1,22 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Kestrel Ridge Opportunities II
+CAPITAL CALL NOTICE
+Notice ID: CC-009-NOTICE-A
+
+Fund Name: Kestrel Ridge Opportunities II
+Investor Name: Morrowgate Insurance Reserve
+Total Commitment: GBP 10.000.000,00
+Amount Due: GBP 625.000,00
+Call Date: 2026-09-04
+Due Date: 2026-09-21
+Currency: GBP
+Payment Reference: KRO2-MIR-CC06
+Document Type: Capital Call
+
+Operational context
+Amounts use full stops as thousands separators and commas as decimal marks, testing locale-aware normalization.
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

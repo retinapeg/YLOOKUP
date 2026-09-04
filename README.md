@@ -37,6 +37,8 @@ The app is intentionally a single local Streamlit process with small, testable m
 - `app/extraction.py` — PDF/text extraction, deterministic field parsing, and an optional OpenAI-compatible structured extractor.
 - `app/reconciliation.py` — deterministic money, date, text, and missing-value rules.
 - `app/storage.py` — append-only SQLite audit history.
+- `app/review.py` — independent, evidence-only validation of extracted values.
+- `app/file_handling.py` — bounded upload validation and temporary-file cleanup.
 - `app/sample_data.py` — bundled, realistic offline cases.
 - `streamlit_app.py` — UI and orchestration only.
 
@@ -49,6 +51,8 @@ The SQLite file is created at `data/fundops.db` and intentionally ignored by Git
 - `data/sample_documents/discrepancy_capital_call.pdf` — deliberate amount and due-date exceptions.
 - Companion `.txt` fixtures keep the sample flow reliable even if PDF parsing is unavailable.
 
+The optional `data/gold/` corpus contains 27 synthetic edge cases for repeatable quality checks. It is separate from the one-click Albion demo, so it cannot change the presentation path.
+
 ## Optional AI extraction
 
 Deterministic extraction is the default and handles the included cases. To enable the optional OpenAI-compatible provider, set:
@@ -60,7 +64,7 @@ export OPENAI_MODEL="gpt-4o-mini"
 export OPENAI_BASE_URL="https://api.openai.com/v1"
 ```
 
-The model is used only to structure unstructured document text. All comparisons, severities, variances, and exception statuses remain deterministic Python logic. If the provider is unavailable or returns invalid data, the UI reports the error and can fall back to deterministic extraction.
+Then enable **Use OpenAI-compatible extraction** in the sidebar before processing an upload. The model is used only to structure unstructured document text. All comparisons, severities, variances, and exception statuses remain deterministic Python logic. If the provider is unavailable or returns invalid data, the extractor falls back to the deterministic result and records a visible extraction note.
 
 ## Tests
 
@@ -69,3 +73,13 @@ pytest -q
 ```
 
 The high-value suite covers exact matches, numeric/date discrepancies, missing fields, demo extraction, and persisted audit decisions.
+
+## Optional evaluation benchmark
+
+Run the versioned synthetic benchmark without an API key:
+
+```bash
+python -m app.evals --mode fixture --skip-reviewer
+```
+
+The output is labelled as a deterministic synthetic baseline, includes explicit numerators and denominators, and is written to the ignored `eval_results.json` file. It is not a production-accuracy claim.

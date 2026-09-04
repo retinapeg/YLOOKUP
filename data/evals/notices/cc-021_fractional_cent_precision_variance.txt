@@ -1,0 +1,22 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Willow Forge Growth Opportunities I
+CAPITAL CALL NOTICE
+Notice ID: CC-021-NOTICE-A
+
+Fund Name: Willow Forge Growth Opportunities I
+Investor Name: Eastmere Social Impact Trust
+Commitment Amount: GBP 12,500,000.00
+Capital Call Amount: GBP 625,000.00
+Call Date: 2026-09-04
+Due Date: 2026-09-30
+Currency: GBP
+Payment Reference: WFGO1-ESI-CC03
+Document Type: Capital Call
+
+Operational context
+The administrator amount differs by half a penny before presentation rounding; the current zero-tolerance control retains the variance rather than silently clearing it.
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

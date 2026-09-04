@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fundops.invalid/schemas/capital-call-reconciliation-gold-v1.json",
+  "title": "FundOps capital-call reconciliation gold corpus",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "synthetic",
+    "reconciliation_fields",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "dataset_id": {
+      "const": "fundops-private-markets-capital-call-v1"
+    },
+    "synthetic": {
+      "const": true
+    },
+    "reconciliation_fields": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "const": "fund_name"
+        },
+        {
+          "const": "investor_name"
+        },
+        {
+          "const": "commitment_amount"
+        },
+        {
+          "const": "capital_call_amount"
+        },
+        {
+          "const": "call_date"
+        },
+        {
+          "const": "due_date"
+        },
+        {
+          "const": "currency"
+        },
+        {
+          "const": "bank_account_reference"
+        },
+        {
+          "const": "management_fee"
+        },
+        {
+          "const": "document_type"
+        }
+      ],
+      "items": false
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 20,
+      "maxItems": 30,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "required": [
+        "case_id",
+        "scenario_types",
+        "canonical_record",
+        "expected_extraction",
+        "expected_reconciliation",
+        "reviewer_label"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^CC-[0-9]{3}$"
+        },
+        "expected_reconciliation": {
+          "type": "object",
+          "required": [
+            "overall_status",
+            "case_severity",
+            "exception_fields",
+            "field_results"
+          ],
+          "properties": {
+            "overall_status": {
+              "enum": [
+                "PASS",
+                "MISMATCH",
+                "MISSING",
+                "REVIEW"
+              ]
+            },
+            "case_severity": {
+              "enum": [
+                "NONE",
+                "LOW",
+                "MEDIUM",
+                "HIGH"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

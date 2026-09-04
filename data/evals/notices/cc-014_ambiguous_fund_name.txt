@@ -1,0 +1,22 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Northstar Growth Fund II
+CAPITAL CALL NOTICE
+Notice ID: CC-014-NOTICE-A
+
+Fund Name: Northstar Growth Fund
+Investor Name: Blackthorn Heritage Foundation
+Commitment Amount: GBP 16,000,000.00
+Capital Call Amount: GBP 400,000.00
+Call Date: 2026-09-04
+Due Date: 2026-09-30
+Currency: GBP
+Payment Reference: NSGFII-BHF-CC04
+Document Type: Capital Call
+
+Operational context
+The notice says only Northstar Growth Fund, and the LP appears in both Fund I and Fund II without a fund identifier.
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

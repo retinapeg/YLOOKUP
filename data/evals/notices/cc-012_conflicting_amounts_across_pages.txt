@@ -1,0 +1,37 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Mariner Square Real Assets II
+CAPITAL CALL NOTICE
+Notice ID: CC-012-NOTICE-A
+
+Fund Name: Mariner Square Real Assets II
+Investor Name: Halcyon Medical Research Foundation
+Commitment Amount: GBP 20,000,000.00
+Capital Call Amount: GBP 625,000.00
+Call Date: 2026-09-04
+Due Date: 2026-09-30
+Currency: GBP
+Payment Reference: MSR2-HMR-CC05
+Document Type: Capital Call
+
+Operational context
+Two pages independently label different values as the current capital-call amount, so no single canonical amount is selected.
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Mariner Square Real Assets II
+CAPITAL CALL SUPPORTING SCHEDULE
+Notice ID: CC-012-NOTICE-A
+
+Capital Call Amount: GBP 650,000.00
+
+Operational context
+Two pages independently label different values as the current capital-call amount, so no single canonical amount is selected.
+Schedule status: CURRENT - independently approved by the fund controller
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

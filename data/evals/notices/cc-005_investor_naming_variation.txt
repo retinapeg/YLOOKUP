@@ -1,0 +1,22 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Merevale Infrastructure Partners II
+CAPITAL CALL NOTICE
+Notice ID: CC-005-NOTICE-A
+
+Fund Name: Merevale Infrastructure Partners II
+Limited Partner: Merevale Teachers Pension Tr. Ltd
+Commitment Amount: GBP 22,000,000.00
+Capital Call Amount: GBP 550,000.00
+Call Date: 2026-09-04
+Due Date: 2026-09-29
+Currency: GBP
+Payment Reference: MIP2-MTP-CC03
+Document Type: Capital Call
+
+Operational context
+A shortened investor name omits punctuation and expands to the same legal entity after entity-name normalization.
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

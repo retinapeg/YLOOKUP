@@ -1,0 +1,24 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Foxglove Life Sciences Fund II
+CAPITAL CALL NOTICE
+Notice ID: CC-022-NOTICE-A
+
+Fund Name: Foxglove Life Sciences Fund II
+Investor Name: Kingswell Research Endowment
+Commitment Amount: GBP 24,000,000.00
+Capital Call Amount: GBP 600,000.00
+Call Date: 2026-09-04
+Due Date: 2026-09-30
+Currency: GBP
+Payment Reference: FLS2-KRE-CC06
+Management Fee: GBP 25,000.00
+Document Type: Capital Call
+
+Operational context
+The notice separates a GBP 600,000 capital contribution from a GBP 25,000 management fee and a GBP 625,000 total due.
+Total cash due including fee: GBP 625,000.00
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

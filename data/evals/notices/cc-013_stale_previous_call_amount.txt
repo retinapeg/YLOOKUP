@@ -1,0 +1,36 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Northstar Growth Fund II
+CAPITAL CALL NOTICE
+Notice ID: CC-013-NOTICE-A
+
+Fund Name: Northstar Growth Fund II
+Investor Name: Rosemere College Endowment
+Commitment Amount: GBP 25,000,000.00
+Capital Call Amount: GBP 625,000.00
+Call Date: 2026-09-04
+Due Date: 2026-09-30
+Currency: GBP
+Payment Reference: NSGFII-RCE-CC05
+Document Type: Capital Call
+
+Operational context
+A history schedule contains Call 04 at GBP 500,000, while the clearly labelled current Call 05 amount is GBP 625,000.
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Northstar Growth Fund II
+CAPITAL CALL SUPPORTING SCHEDULE
+Notice ID: CC-013-NOTICE-A
+
+
+Operational context
+A history schedule contains Call 04 at GBP 500,000, while the clearly labelled current Call 05 amount is GBP 625,000.
+Previous Call 04: GBP 500,000.00 - settled 2026-04-30
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

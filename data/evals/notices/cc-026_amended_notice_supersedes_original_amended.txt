@@ -1,0 +1,23 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Thornfield Private Equity VI
+AMENDED CAPITAL CALL NOTICE
+Notice ID: CC-026-NOTICE-B
+Amendment Status: CURRENT - supersedes CC-026-NOTICE-A
+
+Fund Name: Thornfield Private Equity VI
+Investor Name: Clearbrook Academic Endowment
+Commitment Amount: GBP 25,000,000.00
+Capital Call Amount: GBP 625,000.00
+Call Date: 2026-09-04
+Due Date: 2026-09-30
+Currency: GBP
+Payment Reference: TPE6-CAE-CC04
+Document Type: Capital Call
+
+Operational context
+A later notice explicitly supersedes the GBP 600,000 original and correctly states the current GBP 625,000 call.
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

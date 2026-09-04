@@ -1,0 +1,13 @@
+{
+  "case_id": "CC-002",
+  "fund_name": "Northstar Growth Fund II",
+  "investor_name": "Alderstone Civic Pension Partnership",
+  "commitment_amount": "25000000.00",
+  "capital_call_amount": "625000.00",
+  "call_date": "2026-09-04",
+  "due_date": "2026-09-30",
+  "currency": "GBP",
+  "bank_account_reference": "NSGFII-ALD-CC04",
+  "management_fee": "25000.00",
+  "document_type": "CAPITAL_CALL"
+}

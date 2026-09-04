@@ -1,0 +1,22 @@
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Oak Meridian Continuation Fund I
+CAPITAL CALL NOTICE
+Notice ID: CC-015-NOTICE-A
+
+Fund Name: Oak Meridian Continuation Fund I
+Investor Name: Dunmarsh Public Service Pension Pool
+Commitment Amount: GBP 14,000,000.00
+Capital Call Amount: GBP 350,000.00
+Notice Date: 04 Sep 2026
+Payment Due Date: 30/09/2026
+Currency: GBP
+Payment Reference: OMC1-DPS-CC03
+Document Type: Capital Call
+
+Operational context
+The notice uses written and slash-form dates that normalize to the ISO dates held by the administrator.
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY

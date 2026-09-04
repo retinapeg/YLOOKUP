@@ -26,6 +26,11 @@ FIXTURES = (
         ROOT / "data/sample_documents/discrepancy_capital_call.pdf",
         "EXCEPTION CONTROL",
     ),
+    (
+        ROOT / "data/demo/northstar_growth_fund_ii/capital_call_notice.txt",
+        ROOT / "data/demo/northstar_growth_fund_ii/capital_call_notice.pdf",
+        "NORTHSTAR DEMO",
+    ),
 )
 
 PAGE_WIDTH, PAGE_HEIGHT = A4
@@ -60,18 +65,18 @@ def _draw_chrome(canvas: Canvas, label: str, page_number: int) -> float:
     canvas.drawString(LEFT, PAGE_HEIGHT - 57, "Synthetic operations fixture | Capital-call reconciliation")
 
     canvas.setFillColor(HexColor("#B42318"))
-    canvas.roundRect(RIGHT - 126, PAGE_HEIGHT - 63, 126, 28, 4, stroke=0, fill=1)
+    canvas.roundRect(RIGHT - 170, PAGE_HEIGHT - 63, 170, 28, 4, stroke=0, fill=1)
     canvas.setFillColor(HexColor("#FFFFFF"))
     canvas.setFont("Helvetica-Bold", 7.5)
-    canvas.drawCentredString(RIGHT - 63, PAGE_HEIGHT - 47, "FICTIONAL - DO NOT PAY")
+    canvas.drawCentredString(RIGHT - 85, PAGE_HEIGHT - 47, "FICTIONAL - DEMO ONLY - DO NOT PAY")
     canvas.setFont("Helvetica", 6.5)
-    canvas.drawCentredString(RIGHT - 63, PAGE_HEIGHT - 57, label)
+    canvas.drawCentredString(RIGHT - 85, PAGE_HEIGHT - 57, label)
 
     canvas.setStrokeColor(HexColor("#CBD5E1"))
     canvas.line(LEFT, 42, RIGHT, 42)
     canvas.setFillColor(HexColor("#64748B"))
     canvas.setFont("Helvetica", 7.5)
-    canvas.drawString(LEFT, 28, "FundOps Control Room synthetic corpus | No bank coordinates are included")
+    canvas.drawString(LEFT, 28, "FundOps Copilot synthetic corpus | No bank coordinates are included")
     canvas.drawRightString(RIGHT, 28, f"Page {page_number}")
     return PAGE_HEIGHT - 116
 
@@ -131,8 +136,8 @@ def generate_pdf(source: Path, destination: Path, label: str) -> None:
         pageCompression=1,
         invariant=1,
     )
-    canvas.setAuthor("FundOps Control Room Synthetic Corpus")
-    canvas.setCreator("FundOps Control Room fixture generator")
+    canvas.setAuthor("FundOps Copilot Synthetic Corpus")
+    canvas.setCreator("FundOps Copilot fixture generator")
     canvas.setTitle(f"{label.title()} Capital Call Notice")
     canvas.setSubject("Entirely fictional private-markets reconciliation fixture")
 
