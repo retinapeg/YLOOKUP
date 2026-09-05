@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -77,6 +78,10 @@ def test_fixture_run_has_expected_counts_and_skips_reviewer_cleanly(
     assert summary["label"] == FIXTURE_LABEL
     assert summary["sample_size"]["selected_cases"] == len(SELECTED_CASES)
     assert summary["sample_size"]["selected_documents"] == len(SELECTED_CASES)
+    assert summary["sample_size"]["selected_source_documents"] == len(SELECTED_CASES)
+    assert summary["sample_size"]["attempted_primary_documents"] == len(
+        SELECTED_CASES
+    )
     assert summary["sample_size"]["labelled_extraction_fields"] == 20
     assert summary["operating"]["documents"] == {
         **summary["operating"]["documents"],
@@ -100,6 +105,7 @@ def test_fixture_run_has_expected_counts_and_skips_reviewer_cleanly(
             "requires_human_review": False,
             "challenge_fields": [],
             "counts": None,
+            "failure_policy": "NOT_EVALUATED",
         }
         for case in fixture_report["cases"]
     )
@@ -121,6 +127,13 @@ def test_frontend_service_load_roundtrip(fixture_report: dict, tmp_path: Path):
     assert frontend["label"] == FIXTURE_LABEL
     assert frontend["mode"] == "fixture"
     assert frontend["generated_at"] == fixture_report["generated_at"]
+    assert frontend["artifact_provenance"] == {
+        "schema_version": fixture_report["schema_version"],
+        "git_commit": fixture_report["run"]["git_commit"],
+        "git_worktree_dirty": fixture_report["run"]["git_worktree_dirty"],
+        "execution_mode": "fixture",
+        "reviewer_enabled": False,
+    }
     assert frontend["dataset"] == {
         "id": fixture_report["dataset"]["id"],
         "schema_version": fixture_report["dataset"]["schema_version"],
@@ -138,6 +151,127 @@ def test_frontend_service_load_roundtrip(fixture_report: dict, tmp_path: Path):
     assert frontend["sample_size"]["selected_cases"] == 2
     assert frontend["operating"]["documents"]["attempted"] == 2
     assert frontend["reviewer"] == fixture_report["summary"]["reviewer"]
+
+
+def test_context_bound_reviewer_misses_stay_visible_and_attributed():
+    case_ids = ("CC-007", "CC-012", "CC-020", "CC-025", "CC-027")
+    unresolved_case_ids = {"CC-007", "CC-020", "CC-025", "CC-027"}
+    report = run_evaluation(
+        EvaluationConfig(case_ids=case_ids, output_path=None),
+        write_output=False,
+    )
+
+    reviewer = report["summary"]["reviewer"]
+    context = reviewer["escalation"]["context_required_subset"]
+    assert context["case_ids"] == list(case_ids)
+    assert context["metrics"]["false_negative"] == len(unresolved_case_ids)
+    assert reviewer["escalation"]["end_to_end"]["false_negative"] == len(
+        unresolved_case_ids
+    )
+    assert reviewer["method_provenance"]["finding_counts"] == {
+        "DETERMINISTIC_FIXTURE": 45,
+        "LOCAL_POLICY": 5,
+    }
+
+    misses = [
+        failure
+        for failure in report["failures"]
+        if failure["failure_category"] == "reviewer_false_negative"
+    ]
+    assert {failure["case_id"] for failure in misses} == unresolved_case_ids
+    assert all(
+        failure["root_cause"] == "upstream_context_control_not_replayed"
+        and failure["reconciliation_replayable"] is False
+        and failure["failure_scope"] == "end_to_end_human_escalation"
+        for failure in misses
+    )
+    assert report["summary"]["failure_analysis"]["counts_by_root_cause"][
+        "upstream_context_control_not_replayed"
+    ] == len(unresolved_case_ids)
+    cc_012 = next(case for case in report["cases"] if case["case_id"] == "CC-012")
+    assert cc_012["reviewer"]["requires_human_review"] is True
+    assert not any(failure["case_id"] == "CC-012" for failure in misses)
+    sample = report["summary"]["sample_size"]
+    assert sample["selected_cases"] == 5
+    assert sample["selected_documents"] == 5
+    assert sample["selected_source_documents"] == 7
+    assert sample["attempted_primary_documents"] == 5
+
+
+def test_reviewer_stage_failure_is_a_fail_closed_human_hold(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(
+        eval_runner,
+        "_try_review",
+        lambda *_args, **_kwargs: (None, "SyntheticReviewerFailure", 0.0),
+    )
+
+    report = run_evaluation(
+        EvaluationConfig(case_ids=("CC-001",), output_path=None),
+        write_output=False,
+    )
+
+    case = report["cases"][0]
+    assert case["reviewer"] == {
+        "completed": False,
+        "error_type": "SyntheticReviewerFailure",
+        "requires_human_review": True,
+        "challenge_fields": [],
+        "counts": None,
+        "failure_policy": "FAIL_CLOSED",
+    }
+    escalation = report["summary"]["reviewer"]["escalation"]
+    assert escalation["coverage"] == {
+        "value": 0.0,
+        "numerator": 0,
+        "denominator": 1,
+    }
+    assert escalation["end_to_end"]["false_positive"] == 1
+    failure = next(
+        item
+        for item in report["failures"]
+        if item["field"] == "__reviewer_escalation__"
+    )
+    assert failure["root_cause"] == "reviewer_not_completed"
+
+
+def test_model_cli_without_key_exits_cleanly_and_writes_fail_closed_artifact(
+    tmp_path: Path,
+):
+    output = tmp_path / "no-key-model.json"
+    environment = os.environ.copy()
+    environment.pop("OPENAI_API_KEY", None)
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "app.evals",
+            "--mode",
+            "model",
+            "--case-id",
+            "CC-001",
+            "--output",
+            str(output),
+        ],
+        cwd=ROOT,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 2
+    assert "Traceback" not in completed.stderr
+    assert "no grounded fields with model provenance" in completed.stderr
+    artifact = load_evaluation_results(output)
+    assert artifact["run"]["mode"] == "model"
+    assert artifact["summary"]["operating"]["documents"][
+        "configuration_failure_documents"
+    ] == 1
+    assert artifact["cases"][0]["reviewer"]["failure_policy"] == "FAIL_CLOSED"
+    assert artifact["cases"][0]["reviewer"]["requires_human_review"] is True
 
 
 def test_parenthetical_negative_fixture_cannot_become_a_false_negative():

@@ -7,27 +7,28 @@ import io
 import json
 import os
 from collections.abc import Mapping
+from contextlib import ExitStack
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Optional
-from uuid import uuid4
 
 import pandas as pd
 import streamlit as st
 
-from app.errors import WorkflowError
+from app.errors import WorkflowError, WorkflowErrorCode, WorkflowStage
 from app.evals import EvaluationConfig, run_evaluation
 from app.extraction import OpenAICompatibleExtractor, extract_document
-from app.file_handling import temporary_upload
+from app.file_handling import temporary_upload, validate_upload
 from app.models import AuditEvent, ReviewDecision
+from app.observability import new_request_id, observe_workflow_stage
 from app.reconciliation import reconcile_document
-from app.review import review_reconciliation
+from app.review import OpenAICompatibleEvidenceReviewer, review_reconciliation
 from app.sample_data import (
     DEMO_FILES,
+    DEMO_RECORD_FILES,
     DEMO_REGISTER_CELLS,
     DEMO_REGISTER_FILES,
-    load_demo_case,
     load_fund_record,
 )
 from app.storage import AuditStore
@@ -253,6 +254,41 @@ def _currency(record: Any) -> str:
     return _clean(getattr(record, "currency", "GBP")) if record else "GBP"
 
 
+def _currency_code(value: Any, fallback: str) -> str:
+    if value in (None, ""):
+        return fallback
+    normalized = str(_value(value)).strip().upper()
+    return normalized if len(normalized) == 3 and normalized.isalpha() else fallback
+
+
+def _document_currency(document: Any, fallback: str) -> str:
+    return _currency_code(
+        _field_value(document, "currency") if document is not None else None,
+        fallback,
+    )
+
+
+def _item_currencies(
+    item: Any,
+    record: Any,
+    document: Any,
+) -> tuple[str, str]:
+    """Return truthful units for the canonical and incoming numeric values."""
+
+    expected_fallback = _currency(record)
+    expected = _currency_code(
+        getattr(item, "expected_currency", None),
+        expected_fallback,
+    )
+    if item is not None and hasattr(item, "observed_currency"):
+        # Canonical reports explicitly use None when the incoming unit was not
+        # established. Do not relabel that numeric value with the fund unit.
+        observed = _currency_code(getattr(item, "observed_currency"), "")
+    else:
+        observed = _document_currency(document, "")
+    return expected, observed
+
+
 def _format_value(field: str, value: Any, currency: str = "GBP") -> str:
     if value is None or value == "":
         return "—"
@@ -261,7 +297,12 @@ def _format_value(field: str, value: Any, currency: str = "GBP") -> str:
         try:
             amount = Decimal(str(value).replace(",", ""))
             decimals = 0 if amount == amount.to_integral() else 2
-            return f"{currency} {amount:,.{decimals}f}"
+            rendered = f"{amount:,.{decimals}f}"
+            return (
+                f"{currency} {rendered}"
+                if currency
+                else f"{rendered} · currency unverified"
+            )
         except (InvalidOperation, ValueError):
             pass
     if field in {"call_date", "due_date"}:
@@ -275,12 +316,20 @@ def _format_value(field: str, value: Any, currency: str = "GBP") -> str:
     return str(value)
 
 
-def _format_difference(item: Any, currency: str) -> str:
+def _format_difference(
+    item: Any,
+    currency: str,
+    observed_currency: Optional[str] = None,
+) -> str:
     difference = getattr(item, "difference", None)
     if difference is None:
         return "—"
     field = str(getattr(item, "field", ""))
     if field in AMOUNT_FIELDS:
+        if not observed_currency:
+            return "Not comparable without a verified incoming currency"
+        if observed_currency and observed_currency.casefold() != currency.casefold():
+            return "Not comparable across currencies"
         try:
             amount = Decimal(str(difference))
             sign = "+" if amount > 0 else "−" if amount < 0 else ""
@@ -415,6 +464,14 @@ def _evaluation_view(payload: Any) -> dict[str, Any]:
             "available": True,
             "label": _lookup(summary, "label"),
             "generated_at": _lookup(payload, "generated_at"),
+            "artifact_provenance": {
+                "schema_version": _lookup(payload, "schema_version"),
+                "git_commit": _lookup(_lookup(payload, "run", {}), "git_commit"),
+                "git_worktree_dirty": _lookup(
+                    _lookup(payload, "run", {}), "git_worktree_dirty"
+                ),
+                "execution_mode": _lookup(_lookup(payload, "run", {}), "mode"),
+            },
             "dataset": _lookup(payload, "dataset", {}),
             "metrics": {
                 "field_accuracy": _lookup(extraction, "exact_normalized_field_accuracy"),
@@ -520,8 +577,19 @@ def _document_scope_id(content: bytes, record: Any, document: Any) -> str:
         record_payload = record.model_dump_json().encode("utf-8")
     else:
         record_payload = repr(record).encode("utf-8")
-    if hasattr(document, "model_dump_json"):
-        extraction_payload = document.model_dump_json().encode("utf-8")
+    if hasattr(document, "model_dump"):
+        # Extraction timestamps are operational metadata, not part of the
+        # evidence package identity. Reprocessing identical evidence must
+        # resolve to the same scope so its append-only decisions remain visible.
+        extraction_data = document.model_dump(
+            mode="json",
+            exclude={"fields": {"__all__": {"timestamp"}}},
+        )
+        extraction_payload = json.dumps(
+            extraction_data,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
     else:
         extraction_payload = repr(document).encode("utf-8")
     digest = hashlib.sha256(
@@ -535,87 +603,197 @@ def _scope_token() -> str:
     return hashlib.sha256(document_id.encode("utf-8")).hexdigest()[:12]
 
 
-def _set_case(case: str) -> None:
-    extractor = (
-        OpenAICompatibleExtractor()
-        if st.session_state.get("use_ai_extraction", False)
-        else None
-    )
-    record, document, report = load_demo_case(case, extractor=extractor)
-    review_report = review_reconciliation(report)
-    document_id = _document_scope_id(DEMO_FILES[case].read_bytes(), record, document)
+def _selected_extractor() -> Optional[OpenAICompatibleExtractor]:
+    if not st.session_state.get("use_ai_extraction", False):
+        return None
+    # The adapter owns its deterministic fallback. Constructing it without a
+    # key is safe and keeps a stale/externally restored UI selection from
+    # crashing the offline workflow.
+    return OpenAICompatibleExtractor()
+
+
+def _selected_reviewer() -> Optional[OpenAICompatibleEvidenceReviewer]:
+    if not st.session_state.get("use_ai_review", False):
+        return None
+    # Unlike extraction, review fails closed: the model reviewer returns
+    # NOT_REVIEWED when it is unavailable, which keeps every affected row in
+    # the human queue.
+    return OpenAICompatibleEvidenceReviewer()
+
+
+def _extraction_stage(
+    extractor: Optional[OpenAICompatibleExtractor],
+) -> WorkflowStage:
+    if extractor is not None and extractor.available:
+        return WorkflowStage.AI_EXTRACTION
+    return WorkflowStage.DETERMINISTIC_EXTRACTION
+
+
+def _commit_workflow_result(
+    *,
+    record: Any,
+    document: Any,
+    report: Any,
+    review_report: Any,
+    document_id: str,
+    case_name: str,
+    source_display_name: Optional[str],
+    source_bytes: bytes,
+    source_download_name: str,
+    flash: str,
+    register_path: Optional[Path] = None,
+    register_cells: Optional[Mapping[str, str]] = None,
+) -> None:
+    """Publish a fully completed workflow to the UI in one state update."""
+
+    updates = {
+        "record": record,
+        "document": document,
+        "report": report,
+        "review_report": review_report,
+        "document_id": document_id,
+        "case_name": case_name,
+        "source_display_name": source_display_name or case_name,
+        "source_bytes": source_bytes,
+        "source_download_name": source_download_name,
+        "selected_field": _default_selected_field(report, review_report),
+        "show_upload": False,
+        "flash": flash,
+    }
+    if register_path is not None:
+        updates["register_path"] = register_path
+    if register_cells is not None:
+        updates["register_cells"] = dict(register_cells)
+    st.session_state.update(updates)
+    st.session_state.pop("upload_error", None)
+
+
+def _set_case(case: str, *, request_id: Optional[str] = None) -> str:
+    correlation_id = request_id or new_request_id()
+    st.session_state.workflow_request_id = correlation_id
+    source_path = DEMO_FILES[case]
+    extractor = _selected_extractor()
+    reviewer = _selected_reviewer()
+
+    with observe_workflow_stage(correlation_id, WorkflowStage.FILE_VALIDATION):
+        content = source_path.read_bytes()
+        validate_upload(
+            source_path.name,
+            content,
+            "application/pdf",
+            request_id=correlation_id,
+        )
+        record = load_fund_record(DEMO_RECORD_FILES[case])
+    with observe_workflow_stage(correlation_id, _extraction_stage(extractor)):
+        document = extract_document(
+            source_path,
+            extractor=extractor,
+            case_id=record.case_id,
+        )
+    with observe_workflow_stage(correlation_id, WorkflowStage.RECONCILIATION):
+        report = reconcile_document(record, document)
+    with observe_workflow_stage(correlation_id, WorkflowStage.INDEPENDENT_REVIEW):
+        review_report = review_reconciliation(report, reviewer=reviewer)
+
+    document_id = _document_scope_id(content, record, document)
     case_name = (
         "Northstar Call 04 · Alderstone"
         if case == "discrepancy"
         else "Northstar clean match · Albion"
     )
-    st.session_state.record = record
-    st.session_state.document = document
-    st.session_state.report = report
-    st.session_state.review_report = review_report
-    st.session_state.document_id = document_id
-    st.session_state.case_name = case_name
-    st.session_state.source_display_name = document.source_document
-    st.session_state.source_bytes = DEMO_FILES[case].read_bytes()
-    st.session_state.source_download_name = DEMO_FILES[case].name
-    st.session_state.register_path = DEMO_REGISTER_FILES[case]
-    st.session_state.register_cells = DEMO_REGISTER_CELLS[case]
-    st.session_state.selected_field = _default_selected_field(report, review_report)
-    st.session_state.show_upload = False
-    st.session_state.pop("upload_error", None)
-    st.session_state.flash = f"{st.session_state.case_name} loaded"
+    _commit_workflow_result(
+        record=record,
+        document=document,
+        report=report,
+        review_report=review_report,
+        document_id=document_id,
+        case_name=case_name,
+        source_display_name=document.source_document,
+        source_bytes=content,
+        source_download_name=source_path.name,
+        register_path=DEMO_REGISTER_FILES[case],
+        register_cells=DEMO_REGISTER_CELLS[case],
+        flash=f"{case_name} loaded",
+    )
+    return correlation_id
 
 
-def _process_upload(uploaded: Any) -> None:
+def _process_upload(uploaded: Any, *, request_id: Optional[str] = None) -> str:
+    correlation_id = request_id or new_request_id()
+    st.session_state.workflow_request_id = correlation_id
     record = st.session_state.record
     content_type = getattr(uploaded, "type", None)
     content = uploaded.getvalue()
     source_name = Path(str(uploaded.name).replace("\\", "/")).name
-    extractor = (
-        OpenAICompatibleExtractor()
-        if st.session_state.get("use_ai_extraction", False)
-        else None
-    )
-    with temporary_upload(uploaded.name, content, content_type) as path:
-        document = extract_document(
-            path,
-            extractor=extractor,
-            case_id=record.case_id,
-        )
-    document = document.model_copy(
-        update={
-            "source_document": source_name,
-            "fields": {
-                name: field.model_copy(update={"source": source_name})
-                for name, field in document.fields.items()
-            },
-        }
-    )
-    report = reconcile_document(record, document)
-    review_report = review_reconciliation(report)
+    extractor = _selected_extractor()
+    reviewer = _selected_reviewer()
+
+    with ExitStack() as staged_uploads:
+        with observe_workflow_stage(
+            correlation_id,
+            WorkflowStage.FILE_VALIDATION,
+        ):
+            path = staged_uploads.enter_context(
+                temporary_upload(
+                    uploaded.name,
+                    content,
+                    content_type,
+                    request_id=correlation_id,
+                )
+            )
+        with observe_workflow_stage(correlation_id, _extraction_stage(extractor)):
+            document = extract_document(
+                path,
+                extractor=extractor,
+                case_id=record.case_id,
+            )
+            document = document.model_copy(
+                update={
+                    "source_document": source_name,
+                    "fields": {
+                        name: field.model_copy(update={"source": source_name})
+                        for name, field in document.fields.items()
+                    },
+                }
+            )
+    with observe_workflow_stage(correlation_id, WorkflowStage.RECONCILIATION):
+        report = reconcile_document(record, document)
+    with observe_workflow_stage(correlation_id, WorkflowStage.INDEPENDENT_REVIEW):
+        review_report = review_reconciliation(report, reviewer=reviewer)
+
     document_id = _document_scope_id(content, record, document)
-    st.session_state.document = document
-    st.session_state.report = report
-    st.session_state.review_report = review_report
-    st.session_state.document_id = document_id
-    st.session_state.case_name = source_name
-    st.session_state.source_display_name = st.session_state.case_name
-    st.session_state.source_bytes = content
-    st.session_state.source_download_name = source_name
-    st.session_state.selected_field = _default_selected_field(report, review_report)
-    st.session_state.show_upload = False
-    st.session_state.pop("upload_error", None)
-    st.session_state.flash = f"{st.session_state.case_name} extracted and reconciled"
+    _commit_workflow_result(
+        record=record,
+        document=document,
+        report=report,
+        review_report=review_report,
+        document_id=document_id,
+        case_name=source_name,
+        source_display_name=source_name,
+        source_bytes=content,
+        source_download_name=source_name,
+        flash=f"{source_name} extracted and reconciled",
+    )
+    return correlation_id
 
 
-def _capture_upload_error(error: BaseException) -> None:
-    if isinstance(error, WorkflowError):
-        message = error.public_message
-        request_id = error.request_id
-    else:
-        message = "The workflow could not be completed. Check the package and try again."
-        request_id = str(uuid4())
-    st.session_state.upload_error = {"message": message, "request_id": request_id}
+def _capture_upload_error(
+    error: BaseException,
+    *,
+    request_id: Optional[str] = None,
+) -> dict[str, str]:
+    message = (
+        error.public_message
+        if isinstance(error, WorkflowError)
+        else "The workflow could not be completed. Check the package and try again."
+    )
+    correlation_id = request_id or (
+        error.request_id if isinstance(error, WorkflowError) else new_request_id()
+    )
+    payload = {"message": message, "request_id": correlation_id}
+    st.session_state.workflow_request_id = correlation_id
+    st.session_state.upload_error = payload
+    return payload
 
 
 def _render_upload_error() -> None:
@@ -641,11 +819,19 @@ def _render_sidebar() -> None:
             unsafe_allow_html=True,
         )
         if st.button("Load Demo Case", type="primary", use_container_width=True):
-            _set_case("discrepancy")
-            st.rerun()
+            request_id = new_request_id()
+            try:
+                _set_case("discrepancy", request_id=request_id)
+                st.rerun()
+            except Exception as exc:
+                _capture_upload_error(exc, request_id=request_id)
         if st.button("Load Clean Match", use_container_width=True):
-            _set_case("matching")
-            st.rerun()
+            request_id = new_request_id()
+            try:
+                _set_case("matching", request_id=request_id)
+                st.rerun()
+            except Exception as exc:
+                _capture_upload_error(exc, request_id=request_id)
 
         st.markdown('<div class="rail-label">UPLOAD DOCUMENT</div>', unsafe_allow_html=True)
         uploaded = st.file_uploader(
@@ -661,15 +847,16 @@ def _render_sidebar() -> None:
             disabled=uploaded is None,
             key="sidebar_process",
         ):
+            request_id = new_request_id()
             try:
                 with st.spinner("Extracting fields and applying controls…"):
-                    _process_upload(uploaded)
+                    _process_upload(uploaded, request_id=request_id)
                 st.rerun()
             except Exception as exc:
-                _capture_upload_error(exc)
+                _capture_upload_error(exc, request_id=request_id)
         _render_upload_error()
 
-        st.markdown('<div class="rail-label">EXTRACTION MODE</div>', unsafe_allow_html=True)
+        st.markdown('<div class="rail-label">OPTIONAL MODEL MODES</div>', unsafe_allow_html=True)
         ai_available = bool(os.getenv("OPENAI_API_KEY"))
         st.checkbox(
             "Use OpenAI-compatible extraction",
@@ -680,6 +867,17 @@ def _render_sidebar() -> None:
                 "The provider structures document text only; all comparisons remain deterministic."
                 if ai_available
                 else "Set OPENAI_API_KEY to enable this optional mode."
+            ),
+        )
+        st.checkbox(
+            "Use OpenAI-compatible evidence review",
+            value=False,
+            disabled=not ai_available,
+            key="use_ai_review",
+            help=(
+                "The reviewer checks one extracted field against its cited evidence; it cannot alter reconciliation."
+                if ai_available
+                else "Set OPENAI_API_KEY to enable this optional mode. Unreviewed evidence remains in the human queue."
             ),
         )
         st.markdown(
@@ -734,12 +932,14 @@ def _render_quick_actions() -> None:
             use_container_width=True,
             key="load_northstar",
         ):
+            request_id = new_request_id()
             try:
                 with st.spinner("Loading Northstar and running controls…"):
-                    _set_case("discrepancy")
+                    _set_case("discrepancy", request_id=request_id)
                 st.rerun()
-            except Exception:
-                st.error("The Northstar demo could not be loaded. Please try again.")
+            except Exception as exc:
+                _capture_upload_error(exc, request_id=request_id)
+                _render_upload_error()
     with upload_col:
         if st.button("Upload Document", use_container_width=True, key="toggle_upload"):
             st.session_state.show_upload = not st.session_state.get("show_upload", False)
@@ -772,12 +972,13 @@ def _render_quick_actions() -> None:
                     key="main_process",
                 )
             if process:
+                request_id = new_request_id()
                 try:
                     with st.spinner("Extracting fields and applying controls…"):
-                        _process_upload(uploaded)
+                        _process_upload(uploaded, request_id=request_id)
                     st.rerun()
                 except Exception as exc:
-                    _capture_upload_error(exc)
+                    _capture_upload_error(exc, request_id=request_id)
             _render_upload_error()
 
 
@@ -823,7 +1024,7 @@ def _render_case_status(report: Any, document: Any, review_report: Any = None) -
     )
 
 
-def _render_flagship_break(report: Any, record: Any) -> None:
+def _render_flagship_break(report: Any, record: Any, document: Any = None) -> None:
     amount_item = next(
         (
             item
@@ -845,13 +1046,22 @@ def _render_flagship_break(report: Any, record: Any) -> None:
         getattr(provenance, "source", getattr(report, "source_document", "notice.pdf"))
     )
     location = _source_location(provenance)
+    expected_currency, observed_currency = _item_currencies(
+        amount_item,
+        record,
+        document or st.session_state.get("document"),
+    )
     expected = _format_value(
-        "capital_call_amount", getattr(amount_item, "expected", None), _currency(record)
+        "capital_call_amount", getattr(amount_item, "expected", None), expected_currency
     )
     observed = _format_value(
-        "capital_call_amount", getattr(amount_item, "observed", None), _currency(record)
+        "capital_call_amount", getattr(amount_item, "observed", None), observed_currency
     )
-    variance = _format_difference(amount_item, _currency(record))
+    variance = _format_difference(
+        amount_item,
+        expected_currency,
+        observed_currency,
+    )
     st.markdown(
         "<div class=\"break-card\">"
         '<div class="break-head"><div>'
@@ -928,9 +1138,10 @@ def _table_frame(
     record: Any,
     review_by_field: Mapping,
     review_report: Any = None,
+    document: Any = None,
 ) -> tuple[pd.DataFrame, list[Any]]:
     items = _table_items(report, review_report)
-    currency = _currency(record)
+    document = document or st.session_state.get("document")
     rows = []
     for item in items:
         provenance = getattr(item, "provenance", None)
@@ -940,11 +1151,24 @@ def _table_frame(
         if page is not None:
             source_label = f"{source_label} · p.{page}"
         field = str(getattr(item, "field", ""))
+        expected_currency, observed_currency = _item_currencies(
+            item,
+            record,
+            document,
+        )
         rows.append(
             {
                 "Field": _field_label(field),
-                "Expected": _format_value(field, getattr(item, "expected", None), currency),
-                "Observed": _format_value(field, getattr(item, "observed", None), currency),
+                "Expected": _format_value(
+                    field,
+                    getattr(item, "expected", None),
+                    expected_currency,
+                ),
+                "Observed": _format_value(
+                    field,
+                    getattr(item, "observed", None),
+                    observed_currency,
+                ),
                 "Status": _display_status(item),
                 "Severity": _item_severity(item),
                 "Source": source_label,
@@ -993,8 +1217,15 @@ def _render_reconciliation_table(
     record: Any,
     review_by_field: Mapping,
     review_report: Any = None,
+    document: Any = None,
 ) -> None:
-    frame, items = _table_frame(report, record, review_by_field, review_report)
+    frame, items = _table_frame(
+        report,
+        record,
+        review_by_field,
+        review_report,
+        document,
+    )
     if frame.empty:
         st.info("No reconciliation fields were returned for this package.")
         return
@@ -1125,11 +1356,18 @@ def _render_reconciliation_workspace(
     record: Any,
     review_by_field: Mapping,
     review_report: Any = None,
+    document: Any = None,
 ) -> None:
     st.caption("Select any row to inspect the document evidence. Exceptions are prioritized at the top.")
     table_col, evidence_col = st.columns([4.2, 1.45])
     with table_col:
-        _render_reconciliation_table(report, record, review_by_field, review_report)
+        _render_reconciliation_table(
+            report,
+            record,
+            review_by_field,
+            review_report,
+            document,
+        )
     with evidence_col:
         _render_evidence_drawer(_selected_item(report), report)
 
@@ -1143,7 +1381,13 @@ def _audit_scalar(value: Any) -> Optional[str]:
     return str(value)
 
 
-def _new_audit_event(item: Any, decision: ReviewDecision, note: str) -> AuditEvent:
+def _new_audit_event(
+    item: Any,
+    decision: ReviewDecision,
+    note: str,
+    *,
+    request_id: str,
+) -> AuditEvent:
     report = st.session_state.report
     document = st.session_state.document
     case_id = str(
@@ -1162,6 +1406,11 @@ def _new_audit_event(item: Any, decision: ReviewDecision, note: str) -> AuditEve
             f"{finding.status.value} / "
             f"{str(_value(finding.review_method)).replace('_', ' ')}"
         )
+    expected_currency, observed_currency = _item_currencies(
+        item,
+        st.session_state.record,
+        document,
+    )
     kwargs = {
         "case_id": case_id,
         "document_id": st.session_state.get("document_id", "unspecified"),
@@ -1170,8 +1419,11 @@ def _new_audit_event(item: Any, decision: ReviewDecision, note: str) -> AuditEve
         "field": getattr(item, "field", "unknown"),
         "expected_value": _audit_scalar(getattr(item, "expected", None)),
         "observed_value": _audit_scalar(getattr(item, "observed", None)),
+        "expected_currency": expected_currency or None,
+        "observed_currency": observed_currency or None,
         "difference": _audit_scalar(getattr(item, "difference", None)),
         "reviewer_status": reviewer_status,
+        "request_id": request_id,
         "decision": decision,
         "note": note.strip(),
         "actor": "demo-user",
@@ -1189,6 +1441,7 @@ def _render_exception_detail(
     store: AuditStore,
     review_by_field: Mapping,
     review_report: Any = None,
+    document: Any = None,
 ) -> None:
     exceptions = _escalated_items(report, review_report)
     if not exceptions:
@@ -1220,7 +1473,11 @@ def _render_exception_detail(
     else:
         reviewer_finding = f"{finding.status.value}: {finding.review_reason}"
         reviewer_method = str(_value(finding.review_method)).replace("_", " ").title()
-    currency = _currency(record)
+    expected_currency, observed_currency = _item_currencies(
+        item,
+        record,
+        document or st.session_state.get("document"),
+    )
     latest = review_by_field.get(selected_field)
 
     status_col, severity_col, review_col = st.columns([1, 1, 2])
@@ -1232,9 +1489,9 @@ def _render_exception_detail(
     )
     st.markdown(
         "<div class=\"comparison-grid\">"
-        f'<div class="comparison-cell"><div class="comparison-label">Expected</div><div class="comparison-value">{_escape(_format_value(selected_field, getattr(item, "expected", None), currency))}</div></div>'
-        f'<div class="comparison-cell"><div class="comparison-label">Observed</div><div class="comparison-value">{_escape(_format_value(selected_field, getattr(item, "observed", None), currency))}</div></div>'
-        f'<div class="comparison-cell"><div class="comparison-label">Difference</div><div class="comparison-value">{_escape(_format_difference(item, currency))}</div></div>'
+        f'<div class="comparison-cell"><div class="comparison-label">Expected</div><div class="comparison-value">{_escape(_format_value(selected_field, getattr(item, "expected", None), expected_currency))}</div></div>'
+        f'<div class="comparison-cell"><div class="comparison-label">Observed</div><div class="comparison-value">{_escape(_format_value(selected_field, getattr(item, "observed", None), observed_currency))}</div></div>'
+        f'<div class="comparison-cell"><div class="comparison-label">Difference</div><div class="comparison-value">{_escape(_format_difference(item, expected_currency, observed_currency))}</div></div>'
         "</div>",
         unsafe_allow_html=True,
     )
@@ -1315,15 +1572,33 @@ def _render_exception_detail(
             if len(clean_reason) < 8:
                 st.error("Enter a reason of at least 8 characters before recording this action.")
             else:
+                request_id = new_request_id()
                 try:
                     decision = ACTION_TO_DECISION[action]
-                    store.append(_new_audit_event(item, decision, clean_reason))
+                    with observe_workflow_stage(
+                        request_id,
+                        WorkflowStage.AUDIT_APPEND,
+                    ):
+                        try:
+                            store.append(
+                                _new_audit_event(
+                                    item,
+                                    decision,
+                                    clean_reason,
+                                    request_id=request_id,
+                                )
+                            )
+                        except Exception as exc:
+                            raise WorkflowError(
+                                WorkflowErrorCode.AUDIT_WRITE_FAILED,
+                                request_id=request_id,
+                                stage=WorkflowStage.AUDIT_APPEND,
+                            ) from exc
                     st.session_state.decision_flash = f"{action} recorded for {_field_label(selected_field)}"
                     st.rerun()
-                except Exception as exc:
+                except WorkflowError as exc:
                     st.error(
-                        "The decision could not be recorded. No audit event was added; "
-                        f"please try again. Error type: {type(exc).__name__}."
+                        f"{exc.public_message} Reference: {exc.request_id}"
                     )
 
 
@@ -1337,7 +1612,12 @@ def _event_dict(event: Any) -> dict[str, Any]:
     return {key: _value(value) for key, value in data.items()}
 
 
-def _render_audit_log(store: AuditStore, report: Any, record: Any) -> None:
+def _render_audit_log(
+    store: AuditStore,
+    report: Any,
+    record: Any,
+    document: Any = None,
+) -> None:
     case_id = str(getattr(report, "case_id", ""))
     document_id = st.session_state.get("document_id", "unspecified")
     events = store.list_events(
@@ -1352,11 +1632,26 @@ def _render_audit_log(store: AuditStore, report: Any, record: Any) -> None:
         )
         return
     rows = []
+    items_by_field = {
+        str(getattr(item, "field", "")): item for item in _report_items(report)
+    }
     for event in events:
         data = _event_dict(event)
         timestamp = data.get("timestamp") or data.get("created_at")
         decision = str(data.get("decision", ""))
         field = str(data.get("field", ""))
+        item = items_by_field.get(field)
+        current_expected_currency, current_observed_currency = _item_currencies(
+            item,
+            record,
+            document or st.session_state.get("document"),
+        )
+        expected_currency = str(
+            data.get("expected_currency") or current_expected_currency or ""
+        )
+        observed_currency = str(
+            data.get("observed_currency") or current_observed_currency or ""
+        )
         document_id = str(data.get("document_id") or "unspecified")
         digest = (
             f"sha256:{document_id.removeprefix('sha256:')[:12]}…"
@@ -1365,12 +1660,15 @@ def _render_audit_log(store: AuditStore, report: Any, record: Any) -> None:
         )
         difference = data.get("difference")
         if field in AMOUNT_FIELDS and difference not in (None, ""):
-            try:
-                amount = Decimal(str(difference))
-                sign = "+" if amount > 0 else "−" if amount < 0 else ""
-                difference = f"{_currency(record)} {sign}{abs(amount):,.2f}"
-            except InvalidOperation:
-                pass
+            if observed_currency.casefold() != expected_currency.casefold():
+                difference = "Not comparable across currencies"
+            else:
+                try:
+                    amount = Decimal(str(difference))
+                    sign = "+" if amount > 0 else "−" if amount < 0 else ""
+                    difference = f"{expected_currency} {sign}{abs(amount):,.2f}"
+                except InvalidOperation:
+                    pass
         rows.append(
             {
                 "Event": data.get("id") or "—",
@@ -1378,8 +1676,16 @@ def _render_audit_log(store: AuditStore, report: Any, record: Any) -> None:
                 "Field": _field_label(field),
                 "Human action": DECISION_LABELS.get(decision, decision.replace("_", " ").title()),
                 "Reason": data.get("note") or "—",
-                "Expected": _format_value(field, data.get("expected_value"), _currency(record)),
-                "Observed": _format_value(field, data.get("observed_value"), _currency(record)),
+                "Expected": _format_value(
+                    field,
+                    data.get("expected_value"),
+                    expected_currency,
+                ),
+                "Observed": _format_value(
+                    field,
+                    data.get("observed_value"),
+                    observed_currency,
+                ),
                 "Variance": difference or "—",
                 "Evidence review": data.get("reviewer_status") or "—",
                 "Reviewer": data.get("actor") or data.get("reviewer") or "demo-user",
@@ -1498,11 +1804,23 @@ def _render_evaluation() -> None:
         st.dataframe(pd.DataFrame(detail_rows), use_container_width=True, hide_index=True)
     with detail_right:
         st.markdown("##### Reproducibility envelope")
+        artifact_provenance = view.get("artifact_provenance") or {}
+        git_commit = str(_lookup(artifact_provenance, "git_commit", "") or "")
+        dirty = _lookup(artifact_provenance, "git_worktree_dirty")
+        worktree_state = (
+            "dirty — includes uncommitted changes"
+            if dirty is True
+            else "clean"
+            if dirty is False
+            else "unavailable"
+        )
         st.markdown(
             _drawer_row("Benchmark", view.get("label") or "—")
             + _drawer_row("Dataset", _lookup(dataset, "id", "—"))
             + _drawer_row("Dataset version", _lookup(dataset, "schema_version", "—"))
             + _drawer_row("Dataset SHA-256", str(_lookup(dataset, "sha256", "—"))[:16] + "…")
+            + _drawer_row("Code commit", git_commit[:12] if git_commit else "unavailable")
+            + _drawer_row("Worktree", worktree_state)
             + _drawer_row("Generated (UTC)", generated_at or "—")
             + _drawer_row("Model calls", model_calls),
             unsafe_allow_html=True,
@@ -1666,6 +1984,7 @@ def _render_extraction_ledger(document: Any) -> None:
     run_method = str(
         _value(getattr(document, "extraction_method", "DETERMINISTIC"))
     ).replace("_", " ").title()
+    observed_currency = _document_currency(document, "")
     st.markdown(
         '<div class="eval-disclaimer"><strong>Extraction contract.</strong> '
         f'Current document mode: {_escape(run_method)}. The optional AI adapter may structure '
@@ -1676,7 +1995,7 @@ def _render_extraction_ledger(document: Any) -> None:
     )
     for name, extracted in fields.items():
         with st.expander(
-            f"{_field_label(name)} · {_format_value(name, getattr(extracted, 'value', None), _currency(st.session_state.record))}"
+            f"{_field_label(name)} · {_format_value(name, getattr(extracted, 'value', None), observed_currency)}"
         ):
             meta = st.columns(4)
             meta[0].metric("Source", _display_source_name(getattr(extracted, "source", "Unavailable")))
@@ -1760,7 +2079,7 @@ def main() -> None:
     )
     review_report = st.session_state.get("review_report")
     _render_case_status(report, document, review_report)
-    _render_flagship_break(report, record)
+    _render_flagship_break(report, record, document)
     _render_summary(report, review_by_field, review_report)
 
     if getattr(document, "warnings", None):
@@ -1789,6 +2108,7 @@ def main() -> None:
             record,
             review_by_field,
             review_report,
+            document,
         )
     with tabs[1]:
         _render_exception_detail(
@@ -1797,12 +2117,13 @@ def main() -> None:
             store,
             review_by_field,
             review_report,
+            document,
         )
     with tabs[2]:
         st.caption(
             "Timestamped, append-only human decisions with key reconciliation and evidence-review context."
         )
-        _render_audit_log(store, report, record)
+        _render_audit_log(store, report, record, document)
     with tabs[3]:
         _render_context(record, document)
     with tabs[4]:

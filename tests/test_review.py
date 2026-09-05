@@ -16,7 +16,9 @@ from app.models import (
 from app.review import (
     DeterministicEvidenceReviewer,
     OpenAICompatibleEvidenceReviewer,
+    ReviewMethod,
     ReviewStatus,
+    build_review_request,
     review_item,
     review_reconciliation,
 )
@@ -120,6 +122,7 @@ def test_optional_null_pass_does_not_require_source_evidence_or_human_review():
     assert finding.status is ReviewStatus.SUPPORTED
     assert finding.confidence is None
     assert finding.requires_human_review is False
+    assert finding.review_method is ReviewMethod.LOCAL_POLICY
     assert "not applicable" in finding.review_reason.casefold()
 
 
@@ -266,10 +269,56 @@ def test_missing_evidence_is_insufficient_and_preserves_source_pointer():
     assert finding.challenged_value is None
     assert finding.confidence is None
     assert finding.requires_human_review is True
-    assert finding.source_references[0].model_dump() == {
-        "source": "capital_call_notice.pdf",
-        "page": 2,
-        "evidence": None,
+    reference = finding.source_references[0]
+    assert reference.source == "capital_call_notice.pdf"
+    assert reference.page == 2
+    assert reference.evidence is None
+
+
+def test_workbook_provenance_is_preserved_in_request_and_finding():
+    item = ReconciliationItem(
+        field="capital_call_amount",
+        expected=Decimal("125000"),
+        observed=Decimal("125000"),
+        status=ReconciliationStatus.PASS,
+        severity=Severity.NONE,
+        difference=Decimal("0"),
+        explanation="Deterministic workbook control result",
+        provenance=ExtractedField(
+            value=Decimal("125000"),
+            source="investor_register.xlsx",
+            source_type="XLSX",
+            sheet="LP Register",
+            cell="H27",
+            confidence=0.99,
+            evidence="Capital Call Amount: GBP 125,000",
+            method=ExtractionMethod.DETERMINISTIC,
+            extractor="xlsx-table-v1",
+        ),
+    )
+    report = _report(item)
+
+    request = build_review_request(report, item)
+    finding = review_reconciliation(report).findings[0]
+
+    assert request.provenance.model_dump(mode="json", exclude_none=True) == {
+        "source": "investor_register.xlsx",
+        "source_type": "XLSX",
+        "sheet": "LP Register",
+        "cell": "H27",
+        "extraction_confidence": 0.99,
+        "extraction_method": "DETERMINISTIC",
+        "extractor": "xlsx-table-v1",
+    }
+    assert "extractor" not in request.model_payload()["provenance"]
+    assert "abstention_reason" not in request.model_payload()["provenance"]
+    assert finding.status is ReviewStatus.SUPPORTED
+    assert finding.source_references[0].model_dump(exclude_none=True) == {
+        "source": "investor_register.xlsx",
+        "source_type": "XLSX",
+        "sheet": "LP Register",
+        "cell": "H27",
+        "evidence": "Capital Call Amount: GBP 125,000",
     }
 
 
@@ -286,6 +335,36 @@ def test_model_unavailable_fails_closed_as_not_reviewed():
     assert finding.requires_human_review is True
     assert "no independent model review" in finding.review_reason.casefold()
     assert finding.source_references[0].source == "capital_call_notice.pdf"
+
+
+def test_model_without_credentials_fails_closed_without_a_provider_call(
+    monkeypatch,
+):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    reviewer = OpenAICompatibleEvidenceReviewer(api_key=None, transport=None)
+
+    finding = review_reconciliation(_report(_item()), reviewer=reviewer).findings[0]
+
+    assert reviewer.available is False
+    assert finding.status is ReviewStatus.NOT_REVIEWED
+    assert finding.review_method is ReviewMethod.OPENAI_COMPATIBLE
+    assert finding.requires_human_review is True
+
+
+def test_invalid_reviewer_contract_fails_closed_with_honest_provenance():
+    class InvalidReviewer:
+        review_method = "NOT_A_REAL_METHOD"
+
+        def assess(self, _request):
+            raise AssertionError("invalid reviewer must not be called")
+
+    finding = review_reconciliation(
+        _report(_item()), reviewer=InvalidReviewer()
+    ).findings[0]
+
+    assert finding.status is ReviewStatus.NOT_REVIEWED
+    assert finding.review_method is ReviewMethod.UNAVAILABLE
+    assert finding.requires_human_review is True
 
 
 def test_model_cannot_support_missing_evidence():

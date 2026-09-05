@@ -153,7 +153,9 @@ def print_summary(report: Mapping[str, Any], output_path: Path) -> None:
     total_latency = operations["latency_ms"]["total"]
     print(f"FundOps evaluation — {summary['label']}")
     print(
-        f"Sample: n={sample['selected_cases']} documents, "
+        f"Sample: n={sample['selected_cases']} cases, "
+        f"{sample['selected_source_documents']} corpus documents "
+        f"({sample['attempted_primary_documents']} primary documents executed), "
         f"{sample['labelled_extraction_fields']} labelled fields; "
         f"{sample['replayable_reconciliation_cases']} reconciliation-replayable cases"
     )
@@ -196,6 +198,17 @@ def print_summary(report: Mapping[str, Any], output_path: Path) -> None:
         print("Reviewer challenges: " + _metric(challenge["metrics"]["f1"]))
     else:
         print("Reviewer challenges: n/a — no independent field-level gold labels")
+
+    escalation = summary["reviewer"]["escalation"]
+    if "end_to_end" in escalation:
+        print(
+            "Human escalation (end-to-end): recall "
+            + _metric(escalation["end_to_end"]["recall"])
+            + "; precision "
+            + _metric(escalation["end_to_end"]["precision"])
+            + "; completed-review coverage "
+            + _metric(escalation["coverage"])
+        )
 
     p95 = total_latency["p95_ms"]
     p95_text = "n/a" if p95 is None else f"{p95:.1f} ms"

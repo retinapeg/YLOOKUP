@@ -120,3 +120,31 @@ def test_direct_log_call_rejects_unstructured_values():
             success=False,
             error_code="provider said API key sk-secret",
         )
+
+
+def test_independent_review_stage_uses_the_same_closed_log_contract(caplog):
+    logger_name = "test.fundops.independent_review"
+    logger = logging.getLogger(logger_name)
+    caplog.set_level(logging.INFO, logger=logger_name)
+    request_id = str(uuid4())
+
+    with observe_workflow_stage(
+        request_id,
+        WorkflowStage.INDEPENDENT_REVIEW,
+        logger=logger,
+    ):
+        pass
+
+    payload = json.loads(_messages(caplog, logger_name)[-1])
+    assert payload["request_id"] == request_id
+    assert payload["workflow_stage"] == "independent_review"
+    assert payload["success"] is True
+    assert set(payload) == {
+        "timestamp",
+        "event",
+        "request_id",
+        "workflow_stage",
+        "duration_ms",
+        "success",
+        "outcome",
+    }

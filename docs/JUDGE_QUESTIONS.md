@@ -22,19 +22,19 @@ The current deterministic fixture run reports:
 
 | Measure | Result | Scope |
 | --- | ---: | --- |
-| Exact normalized extraction | 264/270 (97.8%) | All labelled fields |
-| Value accuracy where gold is present | 237/241 (98.3%) | Present fields only |
-| Numeric extraction | 51/54 (94.4%) | Numeric fields |
+| Exact normalized extraction | 267/270 (98.9%) | All labelled fields |
+| Value accuracy where gold is present | 239/241 (99.2%) | Present fields only |
+| Numeric extraction | 53/54 (98.1%) | Numeric fields |
 | Date extraction | 53/53 (100%) | Date fields |
-| Correct abstention | 27/29 (93.1%) | Gold-missing fields |
-| Field exception precision | 12/16 (75.0%) | 21 replayable cases |
+| Correct abstention | 28/29 (96.6%) | Gold-missing fields |
+| Field exception precision | 12/14 (85.7%) | 21 replayable cases |
 | Field exception recall | 12/12 (100%) | 21 replayable cases |
 | High-severity exception recall | 11/11 (100%) | 21 replayable cases |
 | Isolated rule correctness | 210/210 (100%) | Gold extraction injected into deterministic rules |
-| Reviewer escalation precision | 12/15 (80.0%) | Case-level labels |
-| Reviewer escalation recall | 12/17 (70.6%) | Case-level labels |
+| Reviewer escalation precision | 13/16 (81.2%) | Case-level labels |
+| Reviewer escalation recall | 13/17 (76.5%) | Case-level labels |
 
-The five reviewer misses are not hidden: those cases need context beyond the field-specific snippet—register ambiguity, a cross-page conflict, a batch duplicate, a cross-field remaining-commitment check, or a multi-document payment check. Field-level reviewer `CHALLENGE` precision/recall is unavailable because the corpus does not yet label challenge fields. Confidence is a deterministic heuristic and its displayed calibration statistic is descriptive only. The fixture run makes **zero model calls**.
+The four reviewer misses are not hidden: those cases need context beyond the field-specific snippet—register ambiguity, a batch duplicate, a cross-field remaining-commitment check, or a multi-document payment check. The repeated-label cross-page conflict is now detected upstream and safely held. Field-level reviewer `CHALLENGE` precision/recall is unavailable because the corpus does not yet label challenge fields. Confidence is a deterministic heuristic and its displayed calibration statistic is descriptive only. The fixture run makes **zero model calls**.
 
 ## How do you deal with hallucination?
 
@@ -42,13 +42,13 @@ The model cannot create a trusted field merely by returning valid JSON. The extr
 
 A separate reviewer receives one field at a time and independently checks its supplied evidence. It can return `SUPPORTED`, `CHALLENGE`, `INSUFFICIENT_EVIDENCE`, or `NOT_REVIEWED`; it cannot change extraction, reconciliation, or audit decisions. Low-confidence matches, missing data, parsing failures, reviewer failures, and non-pass controls route to a human.
 
-This reduces hallucination risk; it does not make the system hallucination-proof. Verbatim occurrence proves that a citation exists, not that the chosen passage is contextually authoritative. The visible cross-page conflict failure is an example of that remaining limitation.
+This reduces hallucination risk; it does not make the system hallucination-proof. Verbatim occurrence proves that a citation exists, not that the chosen passage is contextually authoritative. Register ambiguity and entity aliases remain visible examples of that limitation.
 
 ## How do you handle ambiguous documents?
 
-The system represents uncertainty rather than inventing a value. Missing observations—including a labelled value the deterministic parser cannot coerce—become `MISSING`; low-confidence observations become `REVIEW`; whole-document parse failures stop the upload; detected unsupported or conflicting evidence is challenged or marked insufficient; reviewer failure becomes `NOT_REVIEWED`. Those states require human review. The benchmark separately exposes conflicts the current field-local reviewer fails to detect.
+The system represents uncertainty rather than inventing a value. An absent observation becomes `MISSING`; a labelled value that is malformed, unsupported, or conflicts with another labelled occurrence becomes an explicit extraction abstention and reconciles as `REVIEW`; low-confidence observations also become `REVIEW`; whole-document parse failures stop the upload; reviewer failure becomes `NOT_REVIEWED`. Those states require human review.
 
-The current deterministic extractor takes the first recognized labelled occurrence and the reviewer sees the field’s cited snippet, not the whole document. Cross-page conflicts and entity resolution therefore remain known gaps in the evaluation table. The production next step is candidate-set extraction over layout-aware pages, followed by explicit ambiguity rules—not asking a model to guess.
+The deterministic extractor evaluates every recognized labelled occurrence, accepts repeated values only when their normalized forms agree, and abstains on conflicts. The reviewer still sees the field’s cited snippet rather than the whole case package, so entity resolution and batch/cross-record context remain known gaps. The production next step is layout-aware candidate extraction and explicit case-context rules—not asking a model to guess.
 
 ## How would this scale?
 
@@ -58,7 +58,7 @@ A production design would store immutable originals in object storage, enqueue i
 
 ## How would you secure customer data?
 
-Implemented safeguards and building blocks include bounded uploads; extension, MIME, and structural validation; PDF and XLSX package checks; random temporary paths and cleanup; sanitized public errors; an allowlisted logging helper that rejects document text and secrets; prompt-injection language in the model instruction; per-field data minimization for model review; and a fully local/offline default path. The logging helper is not yet wired across the Streamlit workflow.
+Implemented safeguards and building blocks include bounded uploads; extension, MIME, and structural validation; PDF and XLSX package checks; random temporary paths and cleanup; sanitized public errors; allowlisted stage logging that rejects document text and secrets; prompt-injection language in the model instruction; per-field data minimization for model review; and a fully local/offline default path. The Streamlit workflow emits correlated stage logs for validation, extraction, reconciliation, independent review, and audit append.
 
 The MVP does not include SSO, RBAC, tenant isolation, encrypted application storage, malware scanning, managed key rotation, regional routing, retention enforcement, or a production deployment. Optional AI extraction sends extracted document text to the configured provider. Production use would require those missing controls, vendor no-training/retention terms, customer-specific data residency, access logs, and deletion policies.
 
@@ -72,8 +72,8 @@ The MVP does not ingest a live workbook: it loads a checked-in canonical JSON sn
 
 The eval gives a defensible order:
 
-1. Add cross-page candidate/conflict handling, locale-aware money parsing, OCR corroboration, and entity alias resolution.
-2. Add batch, duplicate, remaining-commitment, and payment-receipt controls so the five reviewer-escalation misses have the context they require.
+1. Add layout-aware/OCR corroboration and entity alias resolution beyond the implemented labelled-candidate and US/EU monetary rules.
+2. Add batch, duplicate, remaining-commitment, and payment-receipt controls so the four reviewer-escalation misses have the context they require.
 3. Label field-level reviewer challenges and run a permissioned, de-identified real-document evaluation in both deterministic and model modes.
 4. Add the production Excel connector and immutable source retention.
 5. Add enterprise identity, tenant isolation, encryption/key management, observability, and retention controls.
@@ -109,4 +109,4 @@ Synthetic, mocked, or not implemented:
 - No enterprise auth, tenancy, encrypted persistence, immutable source archive, or production deployment exists.
 - The randomized temporary disk copy is deleted after processing. Original bytes remain in active Streamlit session state for source download; the audit retains a binding digest and source locator, not the uploaded file itself.
 - Reviewer challenge metrics are not available without field-level challenge labels.
-- Several cross-page, cross-record, OCR, locale, and entity-resolution cases remain visible failures.
+- Cross-record, OCR-corrupted, and entity-resolution cases remain visible failures; repeated labelled cross-page conflicts now fail closed.

@@ -62,6 +62,13 @@ def frontend_evaluation_summary(
         "label": summary["label"],
         "mode": mode,
         "generated_at": report["generated_at"],
+        "artifact_provenance": {
+            "schema_version": report["schema_version"],
+            "git_commit": report["run"].get("git_commit"),
+            "git_worktree_dirty": report["run"].get("git_worktree_dirty"),
+            "execution_mode": mode,
+            "reviewer_enabled": report["run"].get("reviewer_enabled"),
+        },
         "dataset": {
             "id": report["dataset"]["id"],
             "schema_version": report["dataset"]["schema_version"],

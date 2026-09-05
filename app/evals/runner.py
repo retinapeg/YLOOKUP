@@ -146,6 +146,25 @@ def _safe_git_commit() -> Optional[str]:
     return commit if completed.returncode == 0 and commit else None
 
 
+def _safe_git_worktree_dirty() -> Optional[bool]:
+    """Record whether the measured code differs from the reported commit."""
+
+    try:
+        completed = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=normal"],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if completed.returncode != 0:
+        return None
+    return bool(completed.stdout.strip())
+
+
 def _safe_base_url(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
@@ -451,9 +470,14 @@ def _build_failures(
     field_rows: Sequence[FieldObservation],
     status_rows: Sequence[StatusObservation],
     case_methods: Mapping[str, Optional[str]],
-    reviewer_rows: Sequence[Tuple[str, bool, bool]],
+    reviewer_rows: Sequence[Mapping[str, Any]],
 ) -> List[Dict[str, Any]]:
     status_by_key = {(row.case_id, row.field): row for row in status_rows}
+    cases_with_status_error = {
+        row.case_id
+        for row in status_rows
+        if row.expected_status != row.observed_status
+    }
     failures: List[Dict[str, Any]] = []
     for row in field_rows:
         extraction_correct = not row.pipeline_failed and values_equal(
@@ -507,9 +531,40 @@ def _build_failures(
             }
         )
 
-    for case_id, expected, observed in reviewer_rows:
+    for row in reviewer_rows:
+        case_id = str(row["case_id"])
+        expected = bool(row["expected"])
+        observed = bool(row["observed"])
         if expected == observed:
             continue
+        completed = bool(row["completed"])
+        replayable = bool(row["replayable"])
+        if not completed:
+            root_cause = "reviewer_not_completed"
+            attribution = (
+                "The reviewer did not complete; the workflow's fail-closed policy "
+                "determined the human-escalation outcome."
+            )
+        elif expected and not observed and not replayable:
+            root_cause = "upstream_context_control_not_replayed"
+            attribution = (
+                "The gold escalation depends on batch, cross-field, register, or "
+                "multi-document context that is absent from the field-local "
+                "reconciliation report supplied to the reviewer."
+            )
+        elif not expected and observed and case_id in cases_with_status_error:
+            root_cause = "upstream_control_discrepancy_triggered_hold"
+            attribution = (
+                "An upstream extraction or reconciliation discrepancy correctly "
+                "caused the workflow to hold the case, although the gold case "
+                "assumes the upstream value was handled correctly."
+            )
+        else:
+            root_cause = "reviewer_escalation_mismatch"
+            attribution = (
+                "The completed field-local review outcome disagreed with the "
+                "case-level human-escalation label."
+            )
         failures.append(
             {
                 "case_id": case_id,
@@ -520,7 +575,12 @@ def _build_failures(
                 "failure_category": (
                     "reviewer_false_negative" if expected else "reviewer_false_positive"
                 ),
-                "root_cause": "reviewer_escalation_mismatch",
+                "root_cause": root_cause,
+                "attribution": attribution,
+                "failure_scope": "end_to_end_human_escalation",
+                "review_completed": completed,
+                "reconciliation_replayable": replayable,
+                "scenario_types": list(row["scenario_types"]),
                 "failed_metrics": ["reviewer_escalation"],
                 "expected_status": None,
                 "observed_status": None,
@@ -535,37 +595,83 @@ def _build_failures(
 
 
 def _reviewer_metrics(
-    cases: Sequence[GoldCase], case_results: Sequence[Mapping[str, Any]], available: bool
-) -> Tuple[Dict[str, Any], List[Tuple[str, bool, bool]]]:
+    cases: Sequence[GoldCase],
+    case_results: Sequence[Mapping[str, Any]],
+    available: bool,
+    enabled: bool,
+) -> Tuple[Dict[str, Any], List[Mapping[str, Any]]]:
     results_by_id = {str(result["case_id"]): result for result in case_results}
-    escalation_rows: List[Tuple[str, bool, bool]] = []
+    escalation_rows: List[Mapping[str, Any]] = []
     successful_expected = []
     successful_predicted = []
+    method_counts: Dict[str, int] = {}
     for case in cases:
         expected = bool(case.reviewer_label.get("requires_human_review", False))
         result = results_by_id[case.case_id]
         review = result.get("reviewer") or {}
         predicted = bool(review.get("requires_human_review", False))
-        escalation_rows.append((case.case_id, expected, predicted))
+        completed = bool(review.get("completed"))
+        escalation_rows.append(
+            {
+                "case_id": case.case_id,
+                "expected": expected,
+                "observed": predicted,
+                "completed": completed,
+                "replayable": case.replayable,
+                "scenario_types": case.scenario_types,
+            }
+        )
         if review.get("completed"):
             successful_expected.append(expected)
             successful_predicted.append(predicted)
+            for finding in review.get("findings", []):
+                method = str(finding.get("review_method") or "UNKNOWN")
+                method_counts[method] = method_counts.get(method, 0) + 1
 
     explicit_challenge_labels = any(
         "challenge_fields" in case.reviewer_label for case in cases
     )
-    if available:
+    if enabled:
+        replayable_rows = [row for row in escalation_rows if row["replayable"]]
+        context_rows = [row for row in escalation_rows if not row["replayable"]]
         escalation = {
             "end_to_end": binary_classification(
-                [row[1] for row in escalation_rows],
-                [row[2] for row in escalation_rows],
+                [bool(row["expected"]) for row in escalation_rows],
+                [bool(row["observed"]) for row in escalation_rows],
             ),
             "successful_subset": binary_classification(
                 successful_expected, successful_predicted
             ),
+            "reconciliation_supported_subset": {
+                "metrics": binary_classification(
+                    [bool(row["expected"]) for row in replayable_rows],
+                    [bool(row["observed"]) for row in replayable_rows],
+                ),
+                "case_ids": [str(row["case_id"]) for row in replayable_rows],
+                "definition": (
+                    "Cases whose labelled deterministic controls can be replayed "
+                    "from the canonical record and primary document."
+                ),
+            },
+            "context_required_subset": {
+                "metrics": binary_classification(
+                    [bool(row["expected"]) for row in context_rows],
+                    [bool(row["observed"]) for row in context_rows],
+                ),
+                "case_ids": [str(row["case_id"]) for row in context_rows],
+                "definition": (
+                    "Cases labelled for batch, ambiguity, register, cross-field, "
+                    "or multi-document controls not present in the field-local "
+                    "reviewer's input. Misses remain in end-to-end results."
+                ),
+            },
             "coverage": rate(len(successful_expected), len(cases)),
             "unit": "case",
             "gold_definition": "reviewer_label.requires_human_review",
+            "metric_scope": (
+                "End-to-end human hold behavior after extraction and deterministic "
+                "reconciliation; this is not field-level reviewer challenge accuracy."
+            ),
         }
     else:
         escalation = {
@@ -606,9 +712,18 @@ def _reviewer_metrics(
 
     return {
         "implementation_available": available,
+        "enabled": enabled,
+        "method_provenance": {
+            "finding_counts": dict(sorted(method_counts.items())),
+            "total_findings": sum(method_counts.values()),
+            "definition": (
+                "Counts use each ReviewFinding.review_method; LOCAL_POLICY means "
+                "no external or fixture reviewer was called for that finding."
+            ),
+        },
         "escalation": escalation,
         "challenge_detection": challenge,
-    }, escalation_rows if available else []
+    }, escalation_rows if enabled else []
 
 
 def _operating_metrics(
@@ -1095,12 +1210,14 @@ def run_evaluation(
         )
         reviewer_payload: Dict[str, Any]
         if review_report is None:
+            fail_closed = bool(config.enable_reviewer)
             reviewer_payload = {
                 "completed": False,
                 "error_type": review_error,
-                "requires_human_review": False,
+                "requires_human_review": fail_closed,
                 "challenge_fields": [],
                 "counts": None,
+                "failure_policy": "FAIL_CLOSED" if fail_closed else "NOT_EVALUATED",
             }
         else:
             findings = list(review_report.findings)
@@ -1183,7 +1300,10 @@ def run_evaluation(
         case_level_expected, case_level_predicted
     )
     reviewer_summary, reviewer_rows = _reviewer_metrics(
-        cases, case_results, reviewer_implementation_available
+        cases,
+        case_results,
+        reviewer_implementation_available,
+        config.enable_reviewer,
     )
     all_failures = _build_failures(
         field_rows, status_rows, case_methods, reviewer_rows
@@ -1204,12 +1324,24 @@ def run_evaluation(
     )
 
     gold_missing = sum(is_missing(row.expected) for row in field_rows)
+    failures_by_category: Dict[str, int] = {}
+    failures_by_root_cause: Dict[str, int] = {}
+    for failure in all_failures:
+        category = str(failure["failure_category"])
+        root_cause = str(failure["root_cause"])
+        failures_by_category[category] = failures_by_category.get(category, 0) + 1
+        failures_by_root_cause[root_cause] = (
+            failures_by_root_cause.get(root_cause, 0) + 1
+        )
     summary: Dict[str, Any] = {
         "label": label,
         "sample_size": {
             "dataset_cases": len(dataset.cases),
             "selected_cases": len(cases),
+            # Retained as the legacy count of primary documents executed.
             "selected_documents": len(cases),
+            "selected_source_documents": sum(len(case.documents) for case in cases),
+            "attempted_primary_documents": len(cases),
             "labelled_extraction_fields": len(field_rows),
             "gold_present_fields": len(field_rows) - gold_missing,
             "gold_missing_fields": gold_missing,
@@ -1262,6 +1394,9 @@ def run_evaluation(
         "failure_analysis": {
             "total_failed_case_fields": len(all_failures),
             "returned_worst_count": min(config.max_failures, len(all_failures)),
+            "worst_cases_truncated": len(all_failures) > config.max_failures,
+            "counts_by_category": dict(sorted(failures_by_category.items())),
+            "counts_by_root_cause": dict(sorted(failures_by_root_cause.items())),
             "worst_failed_cases": all_failures[: config.max_failures],
         },
     }
@@ -1283,10 +1418,12 @@ def run_evaluation(
             "mode": config.mode,
             "label": label,
             "git_commit": _safe_git_commit(),
+            "git_worktree_dirty": _safe_git_worktree_dirty(),
             "python_version": platform.python_version(),
             "platform": platform.platform(),
             "numeric_tolerance": str(config.numeric_tolerance),
             "confidence_threshold": config.confidence_threshold,
+            "reviewer_enabled": config.enable_reviewer,
             "model": (
                 getattr(selected_extractor, "model", None)
                 if config.mode == "model"

@@ -6,8 +6,9 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from enum import Enum
 from typing import Dict, List, Optional, Union
+from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class DocumentType(str, Enum):
@@ -74,7 +75,7 @@ class FundRecord(DomainModel):
     @classmethod
     def normalize_currency(cls, value: str) -> str:
         normalized = value.upper()
-        if not normalized.isalpha():
+        if not normalized.isascii() or not normalized.isalpha():
             raise ValueError("currency must be a three-letter code")
         return normalized
 
@@ -100,10 +101,33 @@ class ExtractedField(DomainModel):
 
     value: FieldValue = None
     source: str = Field(min_length=1)
+    source_type: Optional[str] = Field(default=None, min_length=1)
     page: Optional[int] = Field(default=None, ge=1)
+    sheet: Optional[str] = Field(default=None, min_length=1)
+    cell: Optional[str] = Field(default=None, min_length=1)
     confidence: float = Field(ge=0.0, le=1.0)
     evidence: Optional[str] = None
     method: ExtractionMethod = ExtractionMethod.DETERMINISTIC
+    extractor: Optional[str] = Field(default=None, min_length=1)
+    timestamp: Optional[datetime] = None
+    abstention_reason: Optional[str] = Field(default=None, min_length=1)
+
+    @field_validator("timestamp")
+    @classmethod
+    def require_timestamp_timezone(
+        cls, value: Optional[datetime]
+    ) -> Optional[datetime]:
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+            raise ValueError("timestamp must be timezone-aware")
+        return value
+
+    @model_validator(mode="after")
+    def require_coherent_locator(self) -> "ExtractedField":
+        if self.cell is not None and self.sheet is None:
+            raise ValueError("cell requires a workbook sheet")
+        if self.page is not None and (self.sheet is not None or self.cell is not None):
+            raise ValueError("page cannot be combined with a workbook sheet or cell")
+        return self
 
 
 class ExtractedDocument(DomainModel):
@@ -136,6 +160,19 @@ class ReconciliationItem(DomainModel):
     difference: DifferenceValue = None
     explanation: str
     provenance: Optional[ExtractedField] = None
+    expected_currency: Optional[str] = Field(default=None, min_length=3, max_length=3)
+    observed_currency: Optional[str] = Field(default=None, min_length=3, max_length=3)
+    currency_status: Optional[ReconciliationStatus] = None
+
+    @field_validator("expected_currency", "observed_currency")
+    @classmethod
+    def normalize_context_currency(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.upper()
+        if not normalized.isascii() or not normalized.isalpha():
+            raise ValueError("currency context must be a three-letter code")
+        return normalized
 
 
 ReconciliationResult = ReconciliationItem
@@ -170,12 +207,39 @@ class AuditEvent(DomainModel):
     field: str = Field(min_length=1)
     expected_value: Optional[str] = None
     observed_value: Optional[str] = None
+    expected_currency: Optional[str] = Field(default=None, min_length=3, max_length=3)
+    observed_currency: Optional[str] = Field(default=None, min_length=3, max_length=3)
     difference: Optional[str] = None
     reviewer_status: Optional[str] = None
+    request_id: Optional[str] = None
     decision: ReviewDecision
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     note: Optional[str] = None
     actor: str = Field(default="Reviewer", min_length=1)
+
+    @field_validator("expected_currency", "observed_currency")
+    @classmethod
+    def normalize_audit_currency(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.upper()
+        if (
+            len(normalized) != 3
+            or not normalized.isascii()
+            or not normalized.isalpha()
+        ):
+            raise ValueError("currency context must be a three-letter code")
+        return normalized
+
+    @field_validator("request_id")
+    @classmethod
+    def normalize_request_id(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        try:
+            return str(UUID(value))
+        except (TypeError, ValueError, AttributeError) as exc:
+            raise ValueError("request_id must be a valid UUID") from exc
 
     @field_validator("created_at")
     @classmethod

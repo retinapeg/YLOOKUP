@@ -46,8 +46,33 @@ class AuditStore:
                     field TEXT NOT NULL CHECK (length(trim(field)) > 0),
                     expected_value TEXT,
                     observed_value TEXT,
+                    expected_currency TEXT CHECK (
+                        expected_currency IS NULL OR (
+                            length(expected_currency) = 3
+                            AND expected_currency = upper(expected_currency)
+                            AND expected_currency NOT GLOB '*[^A-Z]*'
+                        )
+                    ),
+                    observed_currency TEXT CHECK (
+                        observed_currency IS NULL OR (
+                            length(observed_currency) = 3
+                            AND observed_currency = upper(observed_currency)
+                            AND observed_currency NOT GLOB '*[^A-Z]*'
+                        )
+                    ),
                     difference TEXT,
                     reviewer_status TEXT,
+                    request_id TEXT CHECK (
+                        request_id IS NULL OR (
+                            length(request_id) = 36
+                            AND substr(request_id, 9, 1) = '-'
+                            AND substr(request_id, 14, 1) = '-'
+                            AND substr(request_id, 19, 1) = '-'
+                            AND substr(request_id, 24, 1) = '-'
+                            AND length(replace(request_id, '-', '')) = 32
+                            AND request_id NOT GLOB '*[^0-9a-f-]*'
+                        )
+                    ),
                     decision TEXT NOT NULL CHECK (
                         decision IN ('APPROVED', 'NEEDS_INVESTIGATION', 'REJECTED')
                     ),
@@ -95,12 +120,39 @@ class AuditStore:
                 "source_location",
                 "expected_value",
                 "observed_value",
+                "expected_currency",
+                "observed_currency",
                 "difference",
                 "reviewer_status",
+                "request_id",
             ):
                 if column not in columns:
+                    definition = {
+                        "expected_currency": (
+                            "TEXT CHECK (expected_currency IS NULL OR ("
+                            "length(expected_currency) = 3 "
+                            "AND expected_currency = upper(expected_currency) "
+                            "AND expected_currency NOT GLOB '*[^A-Z]*'))"
+                        ),
+                        "observed_currency": (
+                            "TEXT CHECK (observed_currency IS NULL OR ("
+                            "length(observed_currency) = 3 "
+                            "AND observed_currency = upper(observed_currency) "
+                            "AND observed_currency NOT GLOB '*[^A-Z]*'))"
+                        ),
+                        "request_id": (
+                            "TEXT CHECK (request_id IS NULL OR ("
+                            "length(request_id) = 36 "
+                            "AND substr(request_id, 9, 1) = '-' "
+                            "AND substr(request_id, 14, 1) = '-' "
+                            "AND substr(request_id, 19, 1) = '-' "
+                            "AND substr(request_id, 24, 1) = '-' "
+                            "AND length(replace(request_id, '-', '')) = 32 "
+                            "AND request_id NOT GLOB '*[^0-9a-f-]*'))"
+                        ),
+                    }.get(column, "TEXT")
                     connection.execute(
-                        f"ALTER TABLE audit_events ADD COLUMN {column} TEXT"
+                        f"ALTER TABLE audit_events ADD COLUMN {column} {definition}"
                     )
             connection.execute(
                 """
@@ -129,10 +181,11 @@ class AuditStore:
                 INSERT INTO audit_events
                     (
                         case_id, document_id, source_document, source_location,
-                        field, expected_value, observed_value, difference,
-                        reviewer_status, decision, created_at, note, actor
+                        field, expected_value, observed_value, expected_currency,
+                        observed_currency, difference, reviewer_status, request_id,
+                        decision, created_at, note, actor
                     )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     clean_case_id,
@@ -142,8 +195,11 @@ class AuditStore:
                     clean_field,
                     event.expected_value,
                     event.observed_value,
+                    event.expected_currency,
+                    event.observed_currency,
                     event.difference,
                     event.reviewer_status,
+                    event.request_id,
                     clean_decision,
                     event_time.isoformat(),
                     clean_note,
@@ -161,8 +217,11 @@ class AuditStore:
             field=clean_field,
             expected_value=event.expected_value,
             observed_value=event.observed_value,
+            expected_currency=event.expected_currency,
+            observed_currency=event.observed_currency,
             difference=event.difference,
             reviewer_status=event.reviewer_status,
+            request_id=event.request_id,
             decision=ReviewDecision(clean_decision),
             created_at=event_time,
             note=clean_note,
@@ -180,8 +239,11 @@ class AuditStore:
         source_location: str | None = None,
         expected_value: str | None = None,
         observed_value: str | None = None,
+        expected_currency: str | None = None,
+        observed_currency: str | None = None,
         difference: str | None = None,
         reviewer_status: str | None = None,
+        request_id: str | None = None,
         note: str | None = None,
         actor: str = "Reviewer",
         created_at: datetime | None = None,
@@ -197,8 +259,11 @@ class AuditStore:
                 field=field,
                 expected_value=expected_value,
                 observed_value=observed_value,
+                expected_currency=expected_currency,
+                observed_currency=observed_currency,
                 difference=difference,
                 reviewer_status=reviewer_status,
+                request_id=request_id,
                 decision=ReviewDecision(_normalize_decision(decision)),
                 note=note,
                 actor=actor,
@@ -272,8 +337,11 @@ def record_decision(
     source_location: str | None = None,
     expected_value: str | None = None,
     observed_value: str | None = None,
+    expected_currency: str | None = None,
+    observed_currency: str | None = None,
     difference: str | None = None,
     reviewer_status: str | None = None,
+    request_id: str | None = None,
     note: str | None = None,
     actor: str = "Reviewer",
     created_at: datetime | None = None,
@@ -290,8 +358,11 @@ def record_decision(
         source_location=source_location,
         expected_value=expected_value,
         observed_value=observed_value,
+        expected_currency=expected_currency,
+        observed_currency=observed_currency,
         difference=difference,
         reviewer_status=reviewer_status,
+        request_id=request_id,
         note=note,
         actor=actor,
         created_at=created_at,
@@ -378,6 +449,16 @@ def _row_to_entry(row: sqlite3.Row) -> AuditEvent:
             if row["observed_value"] is not None
             else None
         ),
+        expected_currency=(
+            str(row["expected_currency"])
+            if row["expected_currency"] is not None
+            else None
+        ),
+        observed_currency=(
+            str(row["observed_currency"])
+            if row["observed_currency"] is not None
+            else None
+        ),
         difference=(
             str(row["difference"])
             if row["difference"] is not None
@@ -386,6 +467,11 @@ def _row_to_entry(row: sqlite3.Row) -> AuditEvent:
         reviewer_status=(
             str(row["reviewer_status"])
             if row["reviewer_status"] is not None
+            else None
+        ),
+        request_id=(
+            str(row["request_id"])
+            if row["request_id"] is not None
             else None
         ),
         decision=ReviewDecision(str(row["decision"])),

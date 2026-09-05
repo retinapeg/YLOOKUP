@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import datetime, timezone
+from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
 
 from app.models import AuditEvent, ReviewDecision
-from app.storage import AuditStore
+from app.storage import (
+    AuditStore,
+    get_latest_decision,
+    list_audit_events,
+    record_decision,
+)
 
 
 def test_store_initializes_an_empty_database(tmp_path):
@@ -53,6 +60,71 @@ def test_record_and_list_events_newest_first(tmp_path):
     assert events[1].observed_value == "650000.00"
     assert events[1].difference == "25000.00"
     assert events[1].reviewer_status == "SUPPORTED / DETERMINISTIC FIXTURE"
+
+
+def test_currency_context_and_request_id_round_trip_through_all_apis(tmp_path):
+    db_path = tmp_path / "audit.db"
+    request_id = str(uuid4())
+    store = AuditStore(db_path)
+
+    appended = store.append(
+        AuditEvent(
+            case_id="case-1",
+            document_id="sha256:notice",
+            field="capital_call_amount",
+            expected_value="625000.00",
+            observed_value="650000.00",
+            expected_currency=" gbp ",
+            observed_currency="eur",
+            request_id=request_id.upper(),
+            decision=ReviewDecision.NEEDS_INVESTIGATION,
+        )
+    )
+
+    assert appended.expected_currency == "GBP"
+    assert appended.observed_currency == "EUR"
+    assert appended.request_id == request_id
+    assert store.list_events()[0] == appended
+
+    saved = record_decision(
+        "case-1",
+        "management_fee",
+        "APPROVED",
+        document_id="sha256:notice",
+        expected_currency="GBP",
+        observed_currency="GBP",
+        request_id=request_id,
+        db_path=db_path,
+    )
+
+    assert list_audit_events(db_path=db_path)[0] == saved
+    assert get_latest_decision(
+        "case-1",
+        "management_fee",
+        document_id="sha256:notice",
+        db_path=db_path,
+    ) == saved
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value", "message"),
+    [
+        ("expected_currency", "GB1", "three-letter code"),
+        ("observed_currency", "\u0395\u03a5\u03a1", "three-letter code"),
+        ("observed_currency", "\u00df\u00df\u00df", "three-letter code"),
+        ("request_id", "not-a-request-id", "valid UUID"),
+    ],
+)
+def test_audit_event_rejects_unsafe_context(field_name, value, message):
+    values = {
+        "case_id": "case-1",
+        "field": "capital_call_amount",
+        "decision": ReviewDecision.REJECTED,
+        field_name: value,
+    }
+
+    with pytest.raises(ValidationError, match=message):
+        AuditEvent(**values)
 
 
 def test_latest_decision_is_scoped_to_case_and_field(tmp_path):
@@ -173,11 +245,32 @@ def test_existing_audit_database_is_migrated_without_losing_events(tmp_path):
             (datetime(2026, 9, 4, 9, 0).isoformat(),),
         )
 
-    events = AuditStore(db_path).list_events()
+    store = AuditStore(db_path)
+    events = store.list_events()
 
     assert len(events) == 1
     assert events[0].document_id == "unspecified"
     assert events[0].source_document is None
     assert events[0].expected_value is None
+    assert events[0].expected_currency is None
+    assert events[0].observed_currency is None
     assert events[0].reviewer_status is None
+    assert events[0].request_id is None
     assert events[0].created_at.tzinfo is timezone.utc
+
+    with sqlite3.connect(db_path) as connection:
+        columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(audit_events)")
+        }
+    assert {"expected_currency", "observed_currency", "request_id"} <= columns
+
+    request_id = str(uuid4())
+    migrated_event = store.record_decision(
+        "case-1",
+        "capital_call_amount",
+        "NEEDS_INVESTIGATION",
+        expected_currency="GBP",
+        observed_currency="USD",
+        request_id=request_id,
+    )
+    assert store.list_events()[0] == migrated_event

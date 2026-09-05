@@ -26,6 +26,7 @@ class WorkflowStage(str, Enum):
     DETERMINISTIC_EXTRACTION = "deterministic_extraction"
     AI_EXTRACTION = "ai_extraction"
     RECONCILIATION = "reconciliation"
+    INDEPENDENT_REVIEW = "independent_review"
     AUDIT_APPEND = "audit_append"
     HEALTH_CHECK = "health_check"
     COMPLETE = "complete"

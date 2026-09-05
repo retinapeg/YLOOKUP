@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import date
 from decimal import Decimal
+import re
+from types import SimpleNamespace
+from uuid import UUID
 
 import pytest
 from streamlit.testing.v1 import AppTest
@@ -17,6 +21,9 @@ from app.models import (
     ReconciliationStatus,
     Severity,
 )
+from app.errors import WorkflowStage
+from app.reconciliation import reconcile_document
+from app.storage import AuditStore
 from app.review import (
     ReviewFinding,
     ReviewMethod,
@@ -186,7 +193,9 @@ def test_one_click_demo_loads_complete_exception_workflow(monkeypatch, tmp_path)
     assert any("Field exception recall" in block.value for block in app.markdown)
     assert any("Isolated rule correctness" in block.value for block in app.markdown)
     assert any("Regression gates" in block.value for block in app.markdown)
-    assert len(_dataframe_with_column(app, "Failure").value) == 14
+    assert len(_dataframe_with_column(app, "Failure").value) == 10
+    assert any("Code commit" in block.value for block in app.markdown)
+    assert any("Worktree" in block.value for block in app.markdown)
 
     app.text_input[0].input("Confirm with administrator")
     _button(app, label="Needs investigation").click().run()
@@ -203,6 +212,10 @@ def test_one_click_demo_loads_complete_exception_workflow(monkeypatch, tmp_path)
     assert audit_rows[0]["Source"] == "capital_call_notice.pdf"
     assert audit_rows[0]["Location"] == "PDF page 1"
     assert audit_rows[0]["Package digest"].startswith("sha256:")
+    stored_event = AuditStore(tmp_path / "audit.db").list_events()[0]
+    assert stored_event.expected_currency == "GBP"
+    assert stored_event.observed_currency == "GBP"
+    UUID(stored_event.request_id)
 
 
 def test_one_click_matching_case_has_no_exception_queue(monkeypatch, tmp_path):
@@ -273,4 +286,227 @@ def test_audit_decision_does_not_leak_between_demo_documents(monkeypatch, tmp_pa
     assert all(
         status == "Not required"
         for status in app.dataframe[0].value["Review status"].tolist()
+    )
+
+
+def test_demo_uses_one_request_id_across_all_observed_stages(monkeypatch, tmp_path):
+    monkeypatch.setenv("FUNDOPS_DB_PATH", str(tmp_path / "audit.db"))
+    request_id = "6929230f-73d2-4b5e-8973-184922a572ad"
+    observed: list[tuple[str, str]] = []
+
+    @contextmanager
+    def capture_stage(correlation_id, stage, **_kwargs):
+        observed.append((correlation_id, getattr(stage, "value", str(stage))))
+        yield
+
+    monkeypatch.setattr("app.observability.new_request_id", lambda: request_id)
+    monkeypatch.setattr("app.observability.observe_workflow_stage", capture_stage)
+
+    app = AppTest.from_file("streamlit_app.py", default_timeout=20).run()
+    _button(app, label="Load Demo Case", key="load_northstar").click().run()
+
+    assert list(app.exception) == []
+    assert app.session_state.workflow_request_id == request_id
+    assert observed == [
+        (request_id, WorkflowStage.FILE_VALIDATION.value),
+        (request_id, WorkflowStage.DETERMINISTIC_EXTRACTION.value),
+        (request_id, WorkflowStage.RECONCILIATION.value),
+        (request_id, WorkflowStage.INDEPENDENT_REVIEW.value),
+    ]
+
+
+def test_failed_followup_preserves_last_good_workflow(monkeypatch, tmp_path):
+    monkeypatch.setenv("FUNDOPS_DB_PATH", str(tmp_path / "audit.db"))
+    app = AppTest.from_file("streamlit_app.py", default_timeout=20).run()
+    _button(app, label="Load Demo Case", key="load_northstar").click().run()
+    last_document_id = app.session_state.document_id
+    last_case_name = app.session_state.case_name
+
+    secret = "sk-private source document body"
+
+    def fail_validation(*_args, **_kwargs):
+        raise RuntimeError(secret)
+
+    monkeypatch.setattr("app.file_handling.validate_upload", fail_validation)
+    _button(app, label="Load Clean Match").click().run()
+
+    assert list(app.exception) == []
+    assert app.session_state.document_id == last_document_id
+    assert app.session_state.case_name == last_case_name
+    UUID(app.session_state.workflow_request_id)
+    rendered_errors = " ".join(message.value for message in app.error)
+    assert "workflow could not be completed" in rendered_errors.lower()
+    assert secret not in rendered_errors
+
+
+def test_optional_model_controls_are_disabled_without_a_key(monkeypatch, tmp_path):
+    monkeypatch.setenv("FUNDOPS_DB_PATH", str(tmp_path / "audit.db"))
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    app = AppTest.from_file("streamlit_app.py", default_timeout=20).run()
+    controls = {checkbox.label: checkbox for checkbox in app.checkbox}
+
+    assert controls["Use OpenAI-compatible extraction"].disabled is True
+    assert controls["Use OpenAI-compatible evidence review"].disabled is True
+    _button(app, label="Load Demo Case", key="load_northstar").click().run()
+    assert list(app.exception) == []
+
+
+def test_cross_currency_amounts_keep_their_own_units(monkeypatch, tmp_path):
+    monkeypatch.setenv("FUNDOPS_DB_PATH", str(tmp_path / "audit.db"))
+    case_id = "cross-currency-ui"
+    record = FundRecord(
+        case_id=case_id,
+        fund_name="Northstar Growth Fund II",
+        investor_name="Alderstone Civic Pension Partnership",
+        commitment_amount=Decimal("10000000"),
+        capital_call_amount=Decimal("625000"),
+        call_date=date(2026, 9, 1),
+        due_date=date(2026, 9, 30),
+        currency="GBP",
+    )
+    amount = ExtractedField(
+        value=Decimal("625000"),
+        source="usd-notice.txt",
+        page=1,
+        confidence=0.99,
+        evidence="Capital Call Amount: USD 625,000",
+        method=ExtractionMethod.DETERMINISTIC,
+    )
+    currency = ExtractedField(
+        value="USD",
+        source="usd-notice.txt",
+        page=1,
+        confidence=0.99,
+        evidence="Currency: USD",
+        method=ExtractionMethod.DETERMINISTIC,
+    )
+    document = ExtractedDocument(
+        case_id=case_id,
+        source_document="usd-notice.txt",
+        document_type=DocumentType.CAPITAL_CALL,
+        fields={"capital_call_amount": amount, "currency": currency},
+        extraction_method=ExtractionMethod.DETERMINISTIC,
+    )
+    report = reconcile_document(record, document)
+
+    app = AppTest.from_file("streamlit_app.py", default_timeout=20).run()
+    app.session_state.record = record
+    app.session_state.document = document
+    app.session_state.report = report
+    app.session_state.case_name = "Cross-currency notice"
+    app.session_state.source_display_name = document.source_document
+    app.session_state.document_id = "sha256:cross-currency-ui"
+    app.session_state.selected_field = "currency"
+    app = app.run()
+
+    assert list(app.exception) == []
+    frame = _dataframe_with_column(app, "Review status").value
+    amount_row = frame.loc[frame["Field"] == "Capital call"].iloc[0]
+    currency_row = frame.loc[frame["Field"] == "Currency"].iloc[0]
+    assert amount_row["Expected"] == "GBP 625,000"
+    assert amount_row["Observed"] == "USD 625,000"
+    assert currency_row["Status"] == "MISMATCH"
+
+
+def test_upload_correlates_stages_and_no_key_model_modes_fail_safely(
+    monkeypatch,
+):
+    import streamlit_app as ui
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    request_id = "01a41259-e7af-467e-94c8-156f97dc17b5"
+    observed: list[tuple[str, str]] = []
+
+    @contextmanager
+    def capture_stage(correlation_id, stage, **_kwargs):
+        observed.append((correlation_id, getattr(stage, "value", str(stage))))
+        yield
+
+    class State(dict):
+        __getattr__ = dict.__getitem__
+        __setattr__ = dict.__setitem__
+
+    class Upload:
+        name = "notice.txt"
+        type = "text/plain"
+
+        @staticmethod
+        def getvalue():
+            return b"""Capital Call Notice
+Fund Name: Northstar Growth Fund II
+Investor Name: Alderstone Civic Pension Partnership
+Capital Call Amount: GBP 625,000
+Call Date: 1 September 2026
+Due Date: 30 September 2026
+Currency: GBP
+"""
+
+    state = State(
+        record=FundRecord(
+            case_id="upload-model-fallback",
+            fund_name="Northstar Growth Fund II",
+            investor_name="Alderstone Civic Pension Partnership",
+            commitment_amount=Decimal("10000000"),
+            capital_call_amount=Decimal("625000"),
+            call_date=date(2026, 9, 1),
+            due_date=date(2026, 9, 30),
+            currency="GBP",
+        ),
+        use_ai_extraction=True,
+        use_ai_review=True,
+    )
+    monkeypatch.setattr(ui, "st", SimpleNamespace(session_state=state))
+    monkeypatch.setattr(ui, "observe_workflow_stage", capture_stage)
+
+    assert ui._process_upload(Upload(), request_id=request_id) == request_id
+
+    assert state.workflow_request_id == request_id
+    assert observed == [
+        (request_id, WorkflowStage.FILE_VALIDATION.value),
+        (request_id, WorkflowStage.DETERMINISTIC_EXTRACTION.value),
+        (request_id, WorkflowStage.RECONCILIATION.value),
+        (request_id, WorkflowStage.INDEPENDENT_REVIEW.value),
+    ]
+    assert any(
+        finding.status is ReviewStatus.NOT_REVIEWED
+        for finding in state.review_report.findings
+    )
+
+
+def test_failed_audit_append_is_observed_and_only_shows_safe_reference(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setenv("FUNDOPS_DB_PATH", str(tmp_path / "audit.db"))
+    app = AppTest.from_file("streamlit_app.py", default_timeout=20).run()
+    _button(app, label="Load Demo Case", key="load_northstar").click().run()
+    observed: list[str] = []
+
+    @contextmanager
+    def capture_stage(_request_id, stage, **_kwargs):
+        observed.append(getattr(stage, "value", str(stage)))
+        yield
+
+    secret = "sk-private audit backend detail"
+
+    def fail_append(*_args, **_kwargs):
+        raise RuntimeError(secret)
+
+    monkeypatch.setattr("app.observability.observe_workflow_stage", capture_stage)
+    monkeypatch.setattr("app.storage.AuditStore.append", fail_append)
+    app.text_input[0].input("Confirm with administrator")
+    _button(app, label="Needs investigation").click().run()
+
+    assert list(app.exception) == []
+    assert observed == [WorkflowStage.AUDIT_APPEND.value]
+    rendered_errors = " ".join(message.value for message in app.error)
+    assert "could not be recorded" in rendered_errors
+    assert secret not in rendered_errors
+    assert re.search(
+        r"Reference: [0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",
+        rendered_errors,
+    )
+    assert all(
+        "Human action" not in frame.value.columns for frame in app.dataframe
     )

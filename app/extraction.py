@@ -14,7 +14,6 @@ import os
 import re
 from dataclasses import dataclass
 from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Protocol, Sequence, Union
 from urllib import request
@@ -26,12 +25,32 @@ from .models import (
     ExtractionMethod,
     FieldValue,
 )
+from .normalization import (
+    NormalizationError,
+    UnsupportedValueError,
+    normalize_currency_code,
+    normalize_monetary_value,
+)
 
 
 @dataclass(frozen=True)
 class TextPage:
     number: int
     text: str
+
+
+@dataclass(frozen=True)
+class _ParsedValue:
+    value: FieldValue
+    comparison_value: object
+    currency: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class _LabelledCandidate:
+    parsed: _ParsedValue
+    page: int
+    evidence: str
 
 
 class Extractor(Protocol):
@@ -76,7 +95,7 @@ _PATTERNS: Dict[str, Sequence[re.Pattern[str]]] = {
         ),
     ),
     "currency": (
-        re.compile(r"^\s*Currency\s*:\s*(?P<value>[A-Za-z]{3})\s*$", re.I),
+        re.compile(r"^\s*Currency\s*:\s*(?P<value>.+?)\s*$", re.I),
     ),
     "bank_account_reference": (
         re.compile(
@@ -92,10 +111,25 @@ _PATTERNS: Dict[str, Sequence[re.Pattern[str]]] = {
     ),
 }
 
-_MONEY_FIELDS = frozenset(
-    {"commitment_amount", "capital_call_amount", "management_fee"}
+_MONEY_FIELD_ORDER = (
+    "commitment_amount",
+    "capital_call_amount",
+    "management_fee",
 )
+_MONEY_FIELDS = frozenset(_MONEY_FIELD_ORDER)
 _DATE_FIELDS = frozenset({"call_date", "due_date"})
+_DETERMINISTIC_EXTRACTOR = "deterministic-label-parser-v1"
+
+
+def _source_type(source: str) -> str:
+    """Describe the actual evidence source rather than the uploaded container."""
+
+    suffix = Path(source).suffix.casefold()
+    if suffix == ".pdf":
+        return "application/pdf"
+    if suffix == ".txt":
+        return "text/plain"
+    return "application/octet-stream"
 
 
 def _slugify(value: str) -> str:
@@ -103,24 +137,13 @@ def _slugify(value: str) -> str:
     return slug or "uploaded-document"
 
 
-def _parse_amount(raw: object) -> Decimal:
-    text = str(raw).strip()
-    accounting_negative = text.startswith("(") and text.endswith(")")
-    match = re.search(
-        r"(?P<sign>[-+]?)\s*(?:GBP|USD|EUR|£|\$|€)?\s*"
-        r"(?P<amount>[0-9][0-9,]*(?:\.[0-9]{1,2})?)",
-        text,
-        re.I,
-    )
-    if not match:
-        raise InvalidOperation("no monetary value found")
-    amount = Decimal(match.group("amount").replace(",", ""))
-    if accounting_negative or match.group("sign") == "-":
-        return -amount
-    return amount
-
-
 def _parse_date(raw: object) -> date:
+    if isinstance(raw, datetime):
+        return raw.date()
+    if isinstance(raw, date):
+        return raw
+    if not isinstance(raw, str):
+        raise UnsupportedValueError("date must be text or a date value")
     cleaned = re.sub(r"\s+", " ", str(raw).strip().replace(",", ""))
     for format_string in (
         "%Y-%m-%d",
@@ -147,16 +170,69 @@ def _document_type(raw: object) -> DocumentType:
 
 def _coerce_value(field_name: str, raw: object) -> FieldValue:
     if raw is None:
-        return None
+        raise UnsupportedValueError("field value is missing")
     if field_name in _MONEY_FIELDS:
-        return _parse_amount(raw)
+        return normalize_monetary_value(raw).amount
     if field_name in _DATE_FIELDS:
         return _parse_date(raw)
     if field_name == "currency":
-        return str(raw).strip().upper()
+        return normalize_currency_code(raw)
     if field_name == "document_type":
-        return _document_type(raw).value
-    return str(raw).strip()
+        document_type = _document_type(raw)
+        if document_type is DocumentType.UNKNOWN:
+            raise UnsupportedValueError("unsupported document type")
+        return document_type.value
+    if not isinstance(raw, str):
+        raise UnsupportedValueError("text field must be a string")
+    value = raw.strip()
+    if not value:
+        raise UnsupportedValueError("text field is empty")
+    return value
+
+
+def _parse_candidate(field_name: str, raw: object) -> _ParsedValue:
+    value = _coerce_value(field_name, raw)
+    if field_name in _MONEY_FIELDS:
+        money = normalize_monetary_value(raw)
+        return _ParsedValue(
+            value=money.amount,
+            comparison_value=money.amount,
+            currency=money.currency,
+        )
+    if isinstance(value, str):
+        comparison_value: object = " ".join(value.split()).casefold()
+    else:
+        comparison_value = value
+    return _ParsedValue(value=value, comparison_value=comparison_value)
+
+
+def _candidates_agree(
+    field_name: str, candidates: Sequence[_LabelledCandidate]
+) -> bool:
+    if not candidates:
+        return True
+    comparison_values = {candidate.parsed.comparison_value for candidate in candidates}
+    if len(comparison_values) != 1:
+        return False
+    if field_name in _MONEY_FIELDS:
+        explicit_currencies = {
+            candidate.parsed.currency
+            for candidate in candidates
+            if candidate.parsed.currency is not None
+        }
+        return len(explicit_currencies) <= 1
+    return True
+
+
+def _page_description(page_numbers: Sequence[int]) -> str:
+    pages = sorted(set(page_numbers))
+    if len(pages) == 1:
+        return f"page {pages[0]}"
+    return "pages " + " and ".join(str(page) for page in pages)
+
+
+def _merge_warnings(*groups: Sequence[str]) -> List[str]:
+    return list(dict.fromkeys(warning for group in groups for warning in group))
 
 
 def _read_pages(
@@ -214,6 +290,13 @@ def _extract_pages(
 ) -> ExtractedDocument:
     fields: Dict[str, ExtractedField] = {}
     warnings = list(inherited_warnings or [])
+    actual_source_type = _source_type(source)
+    labelled_candidates: Dict[str, List[_LabelledCandidate]] = {
+        field_name: [] for field_name in _PATTERNS
+    }
+    parse_failures: Dict[str, List[tuple[int, str, str]]] = {
+        field_name: [] for field_name in _PATTERNS
+    }
 
     for page in pages:
         for raw_line in page.text.splitlines():
@@ -221,26 +304,86 @@ def _extract_pages(
             if not evidence:
                 continue
             for field_name, patterns in _PATTERNS.items():
-                if field_name in fields:
-                    continue
-                match = next((pattern.match(evidence) for pattern in patterns if pattern.match(evidence)), None)
+                match = None
+                for pattern in patterns:
+                    match = pattern.match(evidence)
+                    if match is not None:
+                        break
                 if match is None:
                     continue
                 try:
-                    value = _coerce_value(field_name, match.group("value"))
-                except (InvalidOperation, ValueError):
-                    warnings.append(
-                        f"Could not parse {field_name} on page {page.number}: {evidence}"
+                    parsed = _parse_candidate(field_name, match.group("value"))
+                except (NormalizationError, TypeError, ValueError) as exc:
+                    parse_failures[field_name].append(
+                        (page.number, evidence, str(exc))
                     )
                     continue
-                fields[field_name] = ExtractedField(
-                    value=value,
-                    source=source,
-                    page=page.number,
-                    confidence=0.99 if field_name in _MONEY_FIELDS | _DATE_FIELDS else 0.97,
-                    evidence=evidence,
-                    method=method,
+                labelled_candidates[field_name].append(
+                    _LabelledCandidate(
+                        parsed=parsed,
+                        page=page.number,
+                        evidence=evidence,
+                    )
                 )
+
+    for field_name in _PATTERNS:
+        candidates = labelled_candidates[field_name]
+        failures = parse_failures[field_name]
+        if failures:
+            failed_page, failed_evidence, error = failures[0]
+            locations = _page_description([failure[0] for failure in failures])
+            reason = (
+                f"unsupported or ambiguous labelled value on {locations}: {error}"
+            )
+            fields[field_name] = ExtractedField(
+                value=None,
+                source=source,
+                source_type=actual_source_type,
+                page=failed_page,
+                confidence=0.0,
+                evidence=failed_evidence,
+                method=method,
+                extractor=_DETERMINISTIC_EXTRACTOR,
+                abstention_reason=reason,
+            )
+            warnings.append(f"Extraction abstained from {field_name}: {reason}")
+            continue
+
+        if not candidates:
+            continue
+
+        first = candidates[0]
+        if not _candidates_agree(field_name, candidates):
+            candidate_pages = sorted({candidate.page for candidate in candidates})
+            locations = _page_description(candidate_pages)
+            preposition = "across" if len(candidate_pages) > 1 else "on"
+            reason = f"conflicting labelled values {preposition} {locations}"
+            fields[field_name] = ExtractedField(
+                value=None,
+                source=source,
+                source_type=actual_source_type,
+                page=first.page,
+                confidence=0.0,
+                evidence=first.evidence,
+                method=method,
+                extractor=_DETERMINISTIC_EXTRACTOR,
+                abstention_reason=reason,
+            )
+            warnings.append(f"Extraction abstained from {field_name}: {reason}")
+            continue
+
+        fields[field_name] = ExtractedField(
+            value=first.parsed.value,
+            source=source,
+            source_type=actual_source_type,
+            page=first.page,
+            confidence=(
+                0.99 if field_name in _MONEY_FIELDS | _DATE_FIELDS else 0.97
+            ),
+            evidence=first.evidence,
+            method=method,
+            extractor=_DETERMINISTIC_EXTRACTOR,
+        )
 
     all_text = "\n".join(page.text for page in pages)
     if "document_type" in fields:
@@ -264,40 +407,74 @@ def _extract_pages(
             fields["document_type"] = ExtractedField(
                 value=detected_type.value,
                 source=source,
+                source_type=actual_source_type,
                 page=title_page,
                 confidence=0.96,
                 evidence=title_evidence,
                 method=method,
+                extractor=_DETERMINISTIC_EXTRACTOR,
             )
 
     if "currency" not in fields:
-        currency_match = re.search(r"\b(GBP|USD|EUR)\b|([£$€])", all_text, re.I)
-        if currency_match:
-            symbol_map = {"£": "GBP", "$": "USD", "€": "EUR"}
-            currency = (
-                currency_match.group(1).upper()
-                if currency_match.group(1)
-                else symbol_map[currency_match.group(2)]
-            )
-            matching_page = next(
-                (page for page in pages if currency_match.group(0) in page.text),
-                pages[0] if pages else None,
-            )
-            evidence = next(
+        currency_mentions: List[tuple[str, int, str]] = []
+        for field_name in _MONEY_FIELD_ORDER:
+            currency_mentions.extend(
                 (
-                    " ".join(line.split())
-                    for line in (matching_page.text.splitlines() if matching_page else [])
-                    if currency_match.group(0) in line
-                ),
-                currency_match.group(0),
+                    candidate.parsed.currency,
+                    candidate.page,
+                    candidate.evidence,
+                )
+                for candidate in labelled_candidates[field_name]
+                if candidate.parsed.currency is not None
             )
+
+        if not currency_mentions:
+            for page in pages:
+                for raw_line in page.text.splitlines():
+                    evidence = " ".join(raw_line.strip().split())
+                    for match in re.finditer(
+                        r"\b(?:GBP|USD|EUR)\b|[£$€]", evidence, re.I
+                    ):
+                        currency_mentions.append(
+                            (
+                                normalize_currency_code(match.group(0)),
+                                page.number,
+                                evidence,
+                            )
+                        )
+
+        currencies = {mention[0] for mention in currency_mentions}
+        if len(currencies) > 1:
+            first_currency = currency_mentions[0]
+            locations = _page_description(
+                [mention[1] for mention in currency_mentions]
+            )
+            mention_pages = {mention[1] for mention in currency_mentions}
+            preposition = "across" if len(mention_pages) > 1 else "on"
+            reason = f"conflicting currency markers {preposition} {locations}"
+            fields["currency"] = ExtractedField(
+                value=None,
+                source=source,
+                source_type=actual_source_type,
+                page=first_currency[1],
+                confidence=0.0,
+                evidence=first_currency[2],
+                method=method,
+                extractor=_DETERMINISTIC_EXTRACTOR,
+                abstention_reason=reason,
+            )
+            warnings.append(f"Extraction abstained from currency: {reason}")
+        elif currency_mentions:
+            currency, currency_page, currency_evidence = currency_mentions[0]
             fields["currency"] = ExtractedField(
                 value=currency,
                 source=source,
-                page=matching_page.number if matching_page else None,
+                source_type=actual_source_type,
+                page=currency_page,
                 confidence=0.93,
-                evidence=evidence,
+                evidence=currency_evidence,
                 method=method,
+                extractor=_DETERMINISTIC_EXTRACTOR,
             )
 
     return ExtractedDocument(
@@ -491,10 +668,12 @@ class OpenAICompatibleExtractor:
                 }
             )
 
-        pages, read_warnings, _, _ = _read_pages(document_path)
+        pages, read_warnings, evidence_source, _ = _read_pages(document_path)
+        evidence_source_type = _source_type(evidence_source)
         prompt = "\n\n".join(
             f"--- PAGE {page.number} ---\n{page.text}" for page in pages
         )
+        field_warnings: List[str] = []
         try:
             decoded = self._decode_payload(self._request(prompt))
             raw_fields = decoded.get("fields", decoded)
@@ -502,10 +681,19 @@ class OpenAICompatibleExtractor:
                 raise ValueError("response fields must be an object")
 
             ai_fields: Dict[str, ExtractedField] = {}
-            field_warnings: List[str] = []
             for field_name in _PATTERNS:
                 candidate = raw_fields.get(field_name)
                 if candidate is None:
+                    continue
+                baseline_field = baseline.fields.get(field_name)
+                if (
+                    baseline_field is not None
+                    and baseline_field.abstention_reason is not None
+                ):
+                    field_warnings.append(
+                        f"Discarded AI value for {field_name}; retained deterministic "
+                        "extraction abstention"
+                    )
                     continue
                 details = (
                     candidate if isinstance(candidate, Mapping) else {"value": candidate}
@@ -516,13 +704,15 @@ class OpenAICompatibleExtractor:
                     confidence = self._required_confidence(details)
                     ai_fields[field_name] = ExtractedField(
                         value=value,
-                        source=document_path.name,
+                        source=evidence_source,
+                        source_type=evidence_source_type,
                         page=page_number,
                         confidence=confidence,
                         evidence=evidence,
                         method=ExtractionMethod.OPENAI_COMPATIBLE,
+                        extractor=f"openai-compatible-structured-extractor:{self.model}",
                     )
-                except (InvalidOperation, TypeError, ValueError):
+                except (NormalizationError, TypeError, ValueError):
                     field_warnings.append(
                         f"Discarded invalid or ungrounded AI value for {field_name}; "
                         "used deterministic extraction when available"
@@ -539,8 +729,8 @@ class OpenAICompatibleExtractor:
                     detected_type = baseline.document_type
             if len(ai_fields) < len(_PATTERNS):
                 field_warnings.append(
-                    "AI extraction was partial; deterministic extraction supplied "
-                    "the remaining recognized fields"
+                    "AI extraction was partial; deterministic extraction or explicit "
+                    "abstentions supplied the remaining recognized fields"
                 )
             return ExtractedDocument(
                 case_id=case_id or baseline.case_id,
@@ -548,17 +738,23 @@ class OpenAICompatibleExtractor:
                 document_type=detected_type,
                 fields=fields,
                 extraction_method=ExtractionMethod.OPENAI_COMPATIBLE,
-                warnings=baseline.warnings + read_warnings + field_warnings,
+                warnings=_merge_warnings(
+                    baseline.warnings, read_warnings, field_warnings
+                ),
             )
         except Exception as exc:
             return baseline.model_copy(
                 update={
                     "extraction_method": ExtractionMethod.FALLBACK,
-                    "warnings": baseline.warnings
-                    + [
-                        "AI extraction failed; used deterministic extraction "
-                        f"({type(exc).__name__})"
-                    ],
+                    "warnings": _merge_warnings(
+                        baseline.warnings,
+                        read_warnings,
+                        field_warnings,
+                        [
+                            "AI extraction failed; used deterministic extraction "
+                            f"({type(exc).__name__})"
+                        ],
+                    ),
                 }
             )
 

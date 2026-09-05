@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Mapping
 import unicodedata
 
 from .models import (
+    DocumentType,
     ExtractedDocument,
     ExtractedField,
     FieldValue,
@@ -16,6 +17,15 @@ from .models import (
     ReconciliationReport,
     ReconciliationStatus,
     Severity,
+)
+from .normalization import (
+    AmbiguousValueError,
+    NormalizationError,
+    NormalizedMoney,
+    UnsupportedValueError,
+    normalize_currency_code,
+    normalize_monetary_evidence,
+    normalize_monetary_value,
 )
 
 
@@ -58,17 +68,63 @@ def _normalize_reference(value: object) -> str:
 
 
 def _as_decimal(value: object) -> Decimal:
-    if isinstance(value, Decimal):
-        return value
-    if isinstance(value, bool):
-        raise InvalidOperation("booleans are not monetary values")
-    cleaned = str(value).strip().replace(",", "")
-    for token in ("GBP", "USD", "EUR", "£", "$", "€"):
-        cleaned = cleaned.replace(token, "").replace(token.lower(), "")
-    result = Decimal(cleaned.strip())
-    if not result.is_finite():
-        raise InvalidOperation("monetary values must be finite")
-    return result
+    return normalize_monetary_value(value).amount
+
+
+def _normalized_currency_or_none(value: object) -> str | None:
+    if _is_missing(value):
+        return None
+    try:
+        return normalize_currency_code(value)
+    except NormalizationError:
+        return None
+
+
+def _monetary_context(
+    expected_currency: object,
+    observed_currency: object,
+    currency_status: ReconciliationStatus | None,
+) -> dict[str, object]:
+    return {
+        "expected_currency": _normalized_currency_or_none(expected_currency),
+        "observed_currency": _normalized_currency_or_none(observed_currency),
+        "currency_status": currency_status,
+    }
+
+
+def _normalize_extracted_money(extracted: ExtractedField) -> NormalizedMoney:
+    """Cross-check a structured amount against its cited source evidence."""
+
+    normalized = normalize_monetary_value(extracted.value)
+    if not extracted.evidence:
+        return normalized
+
+    if "%" in extracted.evidence:
+        raise UnsupportedValueError("percentage evidence is not a monetary amount")
+    try:
+        evidence = normalize_monetary_evidence(extracted.evidence)
+    except UnsupportedValueError:
+        # OCR-corrupted evidence cannot validate or invalidate an already
+        # structured numeric value. Evidence support remains the independent
+        # reviewer's concern; ambiguous or parseable contradictory evidence
+        # still forces reconciliation to abstain below.
+        return normalized
+    if evidence.amount != normalized.amount:
+        raise AmbiguousValueError(
+            "structured monetary value conflicts with its source evidence"
+        )
+    if (
+        normalized.currency is not None
+        and evidence.currency is not None
+        and normalized.currency != evidence.currency
+    ):
+        raise AmbiguousValueError(
+            "structured monetary currency conflicts with its source evidence"
+        )
+    return NormalizedMoney(
+        amount=normalized.amount,
+        currency=normalized.currency or evidence.currency,
+    )
 
 
 def _as_date(value: object) -> date:
@@ -85,12 +141,46 @@ def _money(value: Decimal, currency: str) -> str:
     return f"{currency} {quantized:,.{decimals}f}"
 
 
+def _low_confidence_severity(
+    field_name: str,
+    expected: FieldValue,
+    extracted: ExtractedField,
+    base_severity: Severity,
+) -> Severity:
+    """Keep matching low-confidence noise low, but prioritize uncertain breaks."""
+
+    observed = extracted.value
+    try:
+        if field_name in NUMERIC_FIELDS:
+            values_match = (
+                _as_decimal(expected) == _normalize_extracted_money(extracted).amount
+            )
+        elif field_name in DATE_FIELDS:
+            values_match = _as_date(expected) == _as_date(observed)
+        elif field_name == "currency":
+            values_match = (
+                normalize_currency_code(expected)
+                == normalize_currency_code(observed)
+            )
+        elif field_name == "bank_account_reference":
+            values_match = (
+                _normalize_reference(expected) == _normalize_reference(observed)
+            )
+        else:
+            values_match = _normalize_text(expected) == _normalize_text(observed)
+    except (NormalizationError, TypeError, ValueError):
+        return base_severity
+    return Severity.LOW if values_match else base_severity
+
+
 def reconcile_field(
     field_name: str,
     expected: FieldValue,
     extracted: ExtractedField | None,
     *,
     currency: str = "",
+    observed_currency: str | None = None,
+    currency_status: ReconciliationStatus | None = None,
     numeric_tolerance: Decimal = Decimal("0"),
     confidence_threshold: float = 0.80,
 ) -> ReconciliationItem:
@@ -98,6 +188,26 @@ def reconcile_field(
 
     observed = extracted.value if extracted else None
     base_severity = _FIELD_SEVERITY.get(field_name, Severity.MEDIUM)
+    monetary_context = (
+        _monetary_context(currency, observed_currency, currency_status)
+        if field_name in NUMERIC_FIELDS
+        else {}
+    )
+
+    if extracted is not None and extracted.abstention_reason is not None:
+        return ReconciliationItem(
+            field=field_name,
+            expected=expected,
+            observed=observed,
+            status=ReconciliationStatus.REVIEW,
+            severity=base_severity,
+            explanation=(
+                "Extraction abstained from this field: "
+                f"{extracted.abstention_reason}"
+            ),
+            provenance=extracted,
+            **monetary_context,
+        )
 
     if _is_missing(expected) and _is_missing(observed):
         return ReconciliationItem(
@@ -108,6 +218,7 @@ def reconcile_field(
             severity=Severity.NONE,
             explanation="No value is expected and none is present in the document",
             provenance=extracted,
+            **monetary_context,
         )
 
     if _is_missing(observed):
@@ -119,6 +230,7 @@ def reconcile_field(
             severity=base_severity,
             explanation="Expected value is missing from the document",
             provenance=extracted,
+            **monetary_context,
         )
 
     if _is_missing(expected):
@@ -130,35 +242,73 @@ def reconcile_field(
             severity=Severity.LOW,
             explanation="Document contains a value that is absent from the fund record",
             provenance=extracted,
+            **monetary_context,
+        )
+
+    if extracted is not None and extracted.confidence < confidence_threshold:
+        return ReconciliationItem(
+            field=field_name,
+            expected=expected,
+            observed=observed,
+            status=ReconciliationStatus.REVIEW,
+            severity=_low_confidence_severity(
+                field_name, expected, extracted, base_severity
+            ),
+            explanation=(
+                "Extraction confidence is below the control threshold; "
+                "deterministic comparison abstained"
+            ),
+            provenance=extracted,
+            **monetary_context,
         )
 
     if field_name in NUMERIC_FIELDS:
         try:
             expected_number = _as_decimal(expected)
-            observed_number = _as_decimal(observed)
-        except (InvalidOperation, ValueError):
+            observed_money = _normalize_extracted_money(extracted)
+            observed_number = observed_money.amount
+            if monetary_context["observed_currency"] is None:
+                monetary_context["observed_currency"] = observed_money.currency
+            elif (
+                observed_money.currency is not None
+                and observed_money.currency
+                != monetary_context["observed_currency"]
+            ):
+                raise AmbiguousValueError(
+                    "amount evidence conflicts with the document currency"
+                )
+        except NormalizationError:
             return ReconciliationItem(
                 field=field_name,
                 expected=expected,
                 observed=observed,
                 status=ReconciliationStatus.REVIEW,
                 severity=base_severity,
-                explanation="Extracted value could not be interpreted as a number",
+                explanation=(
+                    "Extracted number could not be normalized safely; "
+                    "deterministic comparison abstained"
+                ),
                 provenance=extracted,
+                **monetary_context,
             )
 
         difference = observed_number - expected_number
         if abs(difference) <= numeric_tolerance:
-            if extracted is not None and extracted.confidence < confidence_threshold:
-                return ReconciliationItem(
-                    field=field_name,
-                    expected=expected_number,
-                    observed=observed_number,
-                    status=ReconciliationStatus.REVIEW,
-                    severity=Severity.LOW,
-                    difference=difference,
-                    explanation="Values match, but extraction confidence requires review",
-                    provenance=extracted,
+            if currency_status is ReconciliationStatus.PASS:
+                explanation = (
+                    "Document numeric units match the fund record; currency "
+                    "matches in the separate currency control"
+                )
+            elif currency_status is not None:
+                explanation = (
+                    "Document numeric units match the fund record; monetary "
+                    "equivalence is not asserted because the separate currency "
+                    f"control is {currency_status.value}"
+                )
+            else:
+                explanation = (
+                    "Document numeric units match the fund record; currency is "
+                    "controlled separately"
                 )
             return ReconciliationItem(
                 field=field_name,
@@ -167,11 +317,16 @@ def reconcile_field(
                 status=ReconciliationStatus.PASS,
                 severity=Severity.NONE,
                 difference=difference,
-                explanation="Document amount matches the fund record",
+                explanation=explanation,
                 provenance=extracted,
+                **monetary_context,
             )
 
         direction = "higher" if difference > 0 else "lower"
+        if currency_status in (None, ReconciliationStatus.PASS):
+            difference_description = _money(abs(difference), currency)
+        else:
+            difference_description = f"{abs(difference):f} numeric units"
         return ReconciliationItem(
             field=field_name,
             expected=expected_number,
@@ -180,10 +335,11 @@ def reconcile_field(
             severity=base_severity,
             difference=difference,
             explanation=(
-                f"Document amount is {_money(abs(difference), currency)} "
-                f"{direction} than the fund record"
+                f"Document numeric value is {difference_description} {direction} "
+                "than the fund record; currency is controlled separately"
             ),
             provenance=extracted,
+            **monetary_context,
         )
 
     if field_name in DATE_FIELDS:
@@ -203,17 +359,6 @@ def reconcile_field(
 
         difference = (observed_date - expected_date).days
         if difference == 0:
-            if extracted is not None and extracted.confidence < confidence_threshold:
-                return ReconciliationItem(
-                    field=field_name,
-                    expected=expected_date,
-                    observed=observed_date,
-                    status=ReconciliationStatus.REVIEW,
-                    severity=Severity.LOW,
-                    difference=0,
-                    explanation="Values match, but extraction confidence requires review",
-                    provenance=extracted,
-                )
             return ReconciliationItem(
                 field=field_name,
                 expected=expected_date,
@@ -240,22 +385,80 @@ def reconcile_field(
             provenance=extracted,
         )
 
+    if field_name == "currency":
+        try:
+            expected_code = normalize_currency_code(expected)
+            observed_code = normalize_currency_code(observed)
+        except NormalizationError:
+            return ReconciliationItem(
+                field=field_name,
+                expected=expected,
+                observed=observed,
+                status=ReconciliationStatus.REVIEW,
+                severity=base_severity,
+                explanation=(
+                    "Extracted currency is unsupported; deterministic comparison "
+                    "abstained"
+                ),
+                provenance=extracted,
+            )
+
+        if expected_code == observed_code:
+            return ReconciliationItem(
+                field=field_name,
+                expected=expected,
+                observed=observed,
+                status=ReconciliationStatus.PASS,
+                severity=Severity.NONE,
+                explanation="Document currency matches the fund record",
+                provenance=extracted,
+            )
+        return ReconciliationItem(
+            field=field_name,
+            expected=expected,
+            observed=observed,
+            status=ReconciliationStatus.MISMATCH,
+            severity=base_severity,
+            explanation="Document currency does not match the fund record",
+            provenance=extracted,
+        )
+
+    if field_name == "document_type":
+        try:
+            expected_type = DocumentType(str(getattr(expected, "value", expected)).upper())
+            observed_type = DocumentType(str(getattr(observed, "value", observed)).upper())
+        except ValueError:
+            return ReconciliationItem(
+                field=field_name,
+                expected=expected,
+                observed=observed,
+                status=ReconciliationStatus.REVIEW,
+                severity=base_severity,
+                explanation=(
+                    "Extracted document type is unsupported; deterministic "
+                    "comparison abstained"
+                ),
+                provenance=extracted,
+            )
+        if observed_type is DocumentType.UNKNOWN and expected_type is not DocumentType.UNKNOWN:
+            return ReconciliationItem(
+                field=field_name,
+                expected=expected,
+                observed=observed,
+                status=ReconciliationStatus.REVIEW,
+                severity=base_severity,
+                explanation=(
+                    "Document type is unknown; deterministic comparison abstained"
+                ),
+                provenance=extracted,
+            )
+
     if field_name == "bank_account_reference":
         values_match = _normalize_reference(expected) == _normalize_reference(observed)
     else:
         values_match = _normalize_text(expected) == _normalize_text(observed)
 
     if values_match:
-        if extracted is not None and extracted.confidence < confidence_threshold:
-            return ReconciliationItem(
-                field=field_name,
-                expected=expected,
-                observed=observed,
-                status=ReconciliationStatus.REVIEW,
-                severity=Severity.LOW,
-                explanation="Values match, but extraction confidence requires review",
-                provenance=extracted,
-            )
         return ReconciliationItem(
             field=field_name,
             expected=expected,
@@ -305,17 +508,33 @@ def reconcile_document(
             method=document.extraction_method,
         )
 
-    results = [
-        reconcile_field(
-            field_name,
-            expected,
-            extracted_fields.get(field_name),
-            currency=fund_record.currency,
-            numeric_tolerance=numeric_tolerance,
-            confidence_threshold=confidence_threshold,
+    record_values = fund_record.reconciliation_values()
+    currency_field = extracted_fields.get("currency")
+    currency_result = reconcile_field(
+        "currency",
+        record_values["currency"],
+        currency_field,
+        confidence_threshold=confidence_threshold,
+    )
+    document_currency = currency_field.value if currency_field is not None else None
+
+    results = []
+    for field_name, expected in record_values.items():
+        if field_name == "currency":
+            results.append(currency_result)
+            continue
+        results.append(
+            reconcile_field(
+                field_name,
+                expected,
+                extracted_fields.get(field_name),
+                currency=fund_record.currency,
+                observed_currency=document_currency,
+                currency_status=currency_result.status,
+                numeric_tolerance=numeric_tolerance,
+                confidence_threshold=confidence_threshold,
+            )
         )
-        for field_name, expected in fund_record.reconciliation_values().items()
-    ]
 
     counts = {status.value: 0 for status in ReconciliationStatus}
     for result in results:

@@ -51,23 +51,59 @@ class ReviewStatus(str, Enum):
 class ReviewMethod(str, Enum):
     DETERMINISTIC_FIXTURE = "DETERMINISTIC_FIXTURE"
     OPENAI_COMPATIBLE = "OPENAI_COMPATIBLE"
+    LOCAL_POLICY = "LOCAL_POLICY"
+    UNAVAILABLE = "UNAVAILABLE"
 
 
 class ReviewSourceReference(DomainModel):
     """A UI-ready pointer to the evidence supplied to the reviewer."""
 
     source: str = Field(min_length=1)
+    source_type: Optional[str] = Field(default=None, min_length=1)
     page: Optional[int] = Field(default=None, ge=1)
+    sheet: Optional[str] = Field(default=None, min_length=1)
+    cell: Optional[str] = Field(default=None, min_length=1)
     evidence: Optional[str] = None
+
+    @model_validator(mode="after")
+    def require_coherent_locator(self) -> "ReviewSourceReference":
+        if self.cell is not None and self.sheet is None:
+            raise ValueError("cell requires a workbook sheet")
+        if self.page is not None and (self.sheet is not None or self.cell is not None):
+            raise ValueError("page cannot be combined with a workbook sheet or cell")
+        return self
 
 
 class ReviewProvenance(DomainModel):
     """Allowlisted field provenance used as reviewer input."""
 
     source: str = Field(min_length=1)
+    source_type: Optional[str] = Field(default=None, min_length=1)
     page: Optional[int] = Field(default=None, ge=1)
+    sheet: Optional[str] = Field(default=None, min_length=1)
+    cell: Optional[str] = Field(default=None, min_length=1)
     extraction_confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     extraction_method: Optional[ExtractionMethod] = None
+    extractor: Optional[str] = Field(default=None, min_length=1)
+    extraction_timestamp: Optional[datetime] = None
+    abstention_reason: Optional[str] = Field(default=None, min_length=1)
+
+    @field_validator("extraction_timestamp")
+    @classmethod
+    def require_timestamp_timezone(
+        cls, value: Optional[datetime]
+    ) -> Optional[datetime]:
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+            raise ValueError("extraction_timestamp must be timezone-aware")
+        return value
+
+    @model_validator(mode="after")
+    def require_coherent_locator(self) -> "ReviewProvenance":
+        if self.cell is not None and self.sheet is None:
+            raise ValueError("cell requires a workbook sheet")
+        if self.page is not None and (self.sheet is not None or self.cell is not None):
+            raise ValueError("page cannot be combined with a workbook sheet or cell")
+        return self
 
 
 class ReconciliationSnapshot(DomainModel):
@@ -104,7 +140,22 @@ class EvidenceReviewRequest(DomainModel):
             "field": self.field,
             "extracted_value": _json_value(self.extracted_value),
             "source_evidence": self.source_evidence,
-            "provenance": self.provenance.model_dump(mode="json"),
+            # Operational provenance is retained on the local request, while
+            # only the locator and extraction facts needed for evidence review
+            # cross the model boundary. In particular, free-form abstention
+            # reasons are never promoted into model instructions.
+            "provenance": self.provenance.model_dump(
+                mode="json",
+                include={
+                    "source",
+                    "source_type",
+                    "page",
+                    "sheet",
+                    "cell",
+                    "extraction_confidence",
+                    "extraction_method",
+                },
+            ),
             "reconciliation": self.reconciliation.model_dump(mode="json"),
         }
 
@@ -154,6 +205,8 @@ class ReviewFinding(DomainModel):
     def enforce_safety_invariants(self) -> "ReviewFinding":
         if self.status is not ReviewStatus.CHALLENGE and self.challenged_value is not None:
             raise ValueError("challenged_value is only valid for CHALLENGE findings")
+        if self.status is ReviewStatus.NOT_REVIEWED and self.confidence is not None:
+            raise ValueError("NOT_REVIEWED cannot have review confidence")
         expected_escalation = (
             self.reconciliation_status is not ReconciliationStatus.PASS
             or self.status is not ReviewStatus.SUPPORTED
@@ -946,11 +999,21 @@ def build_review_request(
         source_evidence=provenance.evidence if provenance is not None else None,
         provenance=ReviewProvenance(
             source=source,
+            source_type=provenance.source_type if provenance is not None else None,
             page=provenance.page if provenance is not None else None,
+            sheet=provenance.sheet if provenance is not None else None,
+            cell=provenance.cell if provenance is not None else None,
             extraction_confidence=(
                 provenance.confidence if provenance is not None else None
             ),
             extraction_method=provenance.method if provenance is not None else None,
+            extractor=provenance.extractor if provenance is not None else None,
+            extraction_timestamp=(
+                provenance.timestamp if provenance is not None else None
+            ),
+            abstention_reason=(
+                provenance.abstention_reason if provenance is not None else None
+            ),
         ),
         reconciliation=ReconciliationSnapshot(
             status=item.status,
@@ -978,6 +1041,10 @@ def review_item(
         and item.expected is None
         and item.observed is None
     ):
+        # This is a local workflow rule, not evidence-reviewer output. Keeping
+        # the provenance distinct prevents model mode from claiming a provider
+        # reviewed a field when no provider call was made.
+        review_method = ReviewMethod.LOCAL_POLICY
         assessment = ReviewAssessment(
             status=ReviewStatus.SUPPORTED,
             review_reason=(
@@ -987,9 +1054,14 @@ def review_item(
         )
     else:
         try:
+            review_method = ReviewMethod(reviewer.review_method)
             assessment = reviewer.assess(review_request)
             assessment = ReviewAssessment.model_validate(assessment)
         except Exception:
+            try:
+                review_method = ReviewMethod(reviewer.review_method)
+            except Exception:
+                review_method = ReviewMethod.UNAVAILABLE
             assessment = ReviewAssessment(
                 status=ReviewStatus.NOT_REVIEWED,
                 review_reason=(
@@ -1000,7 +1072,10 @@ def review_item(
     references = [
         ReviewSourceReference(
             source=review_request.provenance.source,
+            source_type=review_request.provenance.source_type,
             page=review_request.provenance.page,
+            sheet=review_request.provenance.sheet,
+            cell=review_request.provenance.cell,
             evidence=review_request.source_evidence,
         )
     ]
@@ -1020,7 +1095,7 @@ def review_item(
         source_references=references,
         reconciliation_status=item.status,
         requires_human_review=requires_human_review,
-        review_method=reviewer.review_method,
+        review_method=review_method,
     )
 
 

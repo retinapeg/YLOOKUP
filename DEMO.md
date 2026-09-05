@@ -21,7 +21,7 @@ Do not describe the synthetic benchmark as production performance. Do not imply 
 1. Click **Load Demo Case**.
 2. Point to the red control-break card: “The register expects **GBP 625,000**. The incoming notice says **GBP 650,000**. Exact decimal logic—not a model—produces a **GBP 25,000 HIGH-severity variance**.”
 3. Click **Exception Queue (2)**: “Every extracted value carries the exact PDF sentence and page. A separate evidence reviewer confirms that the source supports 650,000; that does not approve the notice.”
-4. Click **Evals**: “This is an executable 27-document synthetic regression run: **264/270** exact fields, **12/12** gold field exceptions across the 21 replayable cases, and **210/210** isolated deterministic rule outcomes. It made **zero model calls**, so these are not LLM or production claims.”
+4. Click **Evals**: “This is an executable 27-document synthetic regression run: **267/270** exact fields, **12/12** gold field exceptions across the 21 replayable cases, and **210/210** isolated deterministic rule outcomes. It made **zero model calls**, so these are not LLM or production claims.”
 
 Close with: “AI handles the fuzzy document boundary when enabled; deterministic software owns financial controls; humans own consequential decisions.”
 
@@ -33,7 +33,7 @@ Close with: “AI handles the fuzzy document boundary when enabled; deterministi
 4. Click **Reconciliation Results**. “The notice contains several amounts, including historical calls. Extraction selects typed current-call fields and retains source provenance. In offline demo mode that parser is deterministic; the implemented optional LLM path uses the same schema and rejects model fields whose cited text is not found on the claimed page.”
 5. Click **Exception Queue (2)**. Show the expected/observed/difference cards, the exact sentence `Capital Call Amount: GBP 650,000.00`, **PDF page 1**, and the **SUPPORTED** independent finding. Say: “Supported means grounded in the document—not financially correct.”
 6. Enter `Hold pending administrator confirmation` and choose **Needs investigation**. Click **Audit Log**. Show the event ID, human action, expected and observed values, evidence-review result, reason, source locator, and package digest.
-7. Click **Evals**. Read the denominators, then point to **Known failure cases**. “The regression gates pass, but every failure remains visible. The reviewer still misses five cases that need context beyond a field-specific snippet: ambiguity, cross-page, batch, cross-field, and multi-document controls. This is a regression suite, not a victory-lap percentage.”
+7. Click **Evals**. Read the denominators, then point to **Known failure cases**. “The regression gates pass, but every failure remains visible. The reviewer still misses four cases that need context beyond a field-specific snippet: register ambiguity, batch, cross-field, and multi-document controls. The repeated-label cross-page conflict is now held upstream. This is a regression suite, not a victory-lap percentage.”
 
 Close with: “The model never gets authority to decide whether money reconciles, and the system never converts uncertainty into approval.”
 
@@ -61,7 +61,7 @@ Click **Reconciliation Results**, select **Capital call**, and point to the evid
 
 Click **Exception Queue (2)**.
 
-“The reviewer is a separate stage. The default offline reviewer independently re-parses the field-specific evidence and says **SUPPORTED**. That only means the PDF supports the extracted 650,000. It does not clear the 25,000 discrepancy. When the current pipeline detects missing, low-confidence, conflicting, unsupported, or unreviewed evidence, it keeps the case escalated. The visible cross-page-conflict miss shows where detection still needs work.”
+“The reviewer is a separate stage. The default offline reviewer independently re-parses the field-specific evidence and says **SUPPORTED**. That only means the PDF supports the extracted 650,000. It does not clear the 25,000 discrepancy. When the current pipeline detects missing, low-confidence, conflicting, unsupported, or unreviewed evidence, it keeps the case escalated. Issues requiring register, batch, cross-field, or multi-document context remain visible misses.”
 
 ### 1:45–2:20 — Put the human in control
 
@@ -73,10 +73,10 @@ Enter `Hold pending administrator confirmation` and choose **Needs investigation
 
 Click **Evals**.
 
-“These figures were just computed from the current code over 27 fictional documents and 270 labelled fields. Exact normalized extraction is **264/270 (97.8%)**. Field-level exception recall is **12/12 (100%)** and precision is **12/16 (75.0%)**. When extraction is held constant, reconciliation rule correctness is **210/210 (100%)**. Correct abstention is **27/29 (93.1%)**. All four applicable count-based regression gates pass.”
+“These figures were just computed from the current code over 27 fictional documents and 270 labelled fields. Exact normalized extraction is **267/270 (98.9%)**. Field-level exception recall is **12/12 (100%)** and precision is **12/14 (85.7%)**. When extraction is held constant, reconciliation rule correctness is **210/210 (100%)**. Correct abstention is **28/29 (96.6%)**. All four applicable count-based regression gates pass.”
 
 Then point to **Known failure cases**:
 
-“We keep failures in the demo. Locale-formatted amounts, OCR-like corruption, entity aliases, cross-page conflicts, and cross-document controls still need work. Reviewer escalation is **12/17 recall**, because five labelled cases require context beyond the field-specific snippet: ambiguity, cross-page, batch, cross-field, and multi-document checks. There are no field-level reviewer challenge labels yet. The run made **zero model calls**, so nothing here is a production or LLM-performance claim.”
+“We keep failures in the demo. OCR-like corruption, entity aliases, and cross-record controls still need work; labelled US/EU amounts and repeated-label cross-page conflicts now have deterministic handling. Reviewer escalation is **13/17 recall**, because four labelled cases require context beyond the field-specific snippet: register ambiguity, batch, cross-field, and multi-document checks. There are no field-level reviewer challenge labels yet. The run made **zero model calls**, so nothing here is a production or LLM-performance claim.”
 
 Close with: “The engineering choice is the product: probabilistic extraction at the fuzzy edge, deterministic reconciliation at the financial core, an independent evidence check, and a human decision backed by an executable audit and eval trail.”

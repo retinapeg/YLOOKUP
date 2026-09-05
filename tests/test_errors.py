@@ -63,3 +63,7 @@ def test_error_contract_rejects_free_form_correlation_values():
             request_id=str(uuid4()),
             stage="uploaded document contents",
         )
+
+
+def test_independent_review_is_an_explicit_observable_stage():
+    assert WorkflowStage.INDEPENDENT_REVIEW.value == "independent_review"
