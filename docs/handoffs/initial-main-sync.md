@@ -34,7 +34,7 @@ TEST STATUS: PASS — 150 tests passed; offline smoke passed; fixture evaluation
 
 TESTS RUN:
 
-- `.venv/bin/python -m pytest -q` — `150 passed in 15.47s`.
+- `.venv/bin/python -m pytest -q` — `150 passed in 26.70s` on the final pre-push rerun (the integration checkpoint also passed in 15.47s).
 - `env -u OPENAI_API_KEY .venv/bin/python -m scripts.smoke_demo` — Northstar `MISMATCH` with two exceptions, clean case `PASS`, no-key model mode disclosed `FALLBACK`, and audit append `PASS`.
 - `.venv/bin/python -m app.evals --mode fixture --output /tmp/fundops-checkpoint-eval.json --fail-on-regression` — 4/4 gates passed, 267/270 exact extracted fields, 12/12 exception recall at 12/14 precision, and 210/210 isolated reconciliation rules.
 
