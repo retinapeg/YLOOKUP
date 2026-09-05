@@ -20,7 +20,8 @@ WHAT IS PARTIALLY IMPLEMENTED:
 
 - The checked-in XLSX is a real fixture, but live UI ingestion uses its canonical JSON snapshot.
 - OCR/layout-aware parsing, entity resolution, batch/cross-record controls, immutable source storage, enterprise identity, and deployment controls are not implemented.
-- The requested remote branch review and GitHub push cannot be completed until the existing repository URL is supplied; this clone has no configured remotes and the named agent refs are absent locally.
+- A fresh temporary-virtualenv dependency reinstall was deferred by the urgent checkpoint; the existing project virtualenv passes `pip`-level execution, the full suite, eval, and smoke checks.
+- No pre-existing remote-tracking history or named agent refs were available to review. The user subsequently confirmed the already-created `retinapeg/fundops-control-room` repository object as the shared handoff target.
 
 FILES CHANGED:
 
@@ -43,7 +44,7 @@ TESTS RUN:
 
 KNOWN FAILURES:
 
-- No `origin` remote exists, so a push attempt will fail until the correct existing GitHub URL is configured. Do not create or guess a repository.
+- No pre-existing GitHub branch history was available for comparison before the canonical repository bootstrap.
 - Synthetic fixture evaluation retains ten failure rows. Four are case-level reviewer false negatives requiring register, batch, cross-field, or multi-document context; the other rows expose extraction/reviewer precision limitations.
 - Model-backed quality has not been established; fixture mode makes zero model calls.
 
@@ -59,7 +60,7 @@ INTERFACES CHANGED:
 WHAT THE INTEGRATION AGENT MUST KNOW:
 
 - Canonical contracts are `docs/AGENT_CONTRACTS.md`; do not add parallel models, normalizers, reconciliation engines, reviewers, or audit tables.
-- At checkout time there was no `origin`, no remote-tracking refs, no unreachable branch commits, and no historical copies of the requested architecture/contract documents. Earlier agent work was already combined into the shared working tree/main history, so no named branch diff could be truthfully reviewed.
+- At checkout time there was no `origin`, no remote-tracking refs, no unreachable branch commits, and no historical copies of the requested architecture/contract documents. Earlier agent work was already combined into the shared working tree/main history, so no named branch diff could be truthfully reviewed. The user later confirmed the existing `retinapeg/fundops-control-room` repository object for the checkpoint push.
 - Current fixture metrics are 267/270 exact extracted fields, 12/12 exception recall at 12/14 precision, 210/210 isolated rule correctness, 13/17 reviewer escalation recall at 13/16 precision, and 4/4 gates passing. These are synthetic regression results, not production or LLM accuracy.
 - Preserve the fail-closed distinction: model interpretation structures evidence; deterministic code normalizes/reconciles; the independent reviewer cannot clear a deterministic break; only a human appends a decision.
-- Before any push, verify the user-provided existing remote with `git ls-remote`; never force push or invent a repository.
+- Use the single user-confirmed repository object, fetch `origin` before future integration, verify the current branch/upstream, and never force push or create a competing repository.
