@@ -6,14 +6,14 @@ boundary.
 
 ## Working policy
 
-- `main` is the stable integration branch after the initial sync recorded in
-  `docs/handoffs/initial-main-sync.md`.
+- `main` is the stable integration branch.
 - Do feature work on a focused branch, normally prefixed with `feature/` or
   `codex/`. Do not force-push or rewrite shared history.
 - Fetch before starting, preserve concurrent work, and integrate semantically.
   Do not resolve conflicts by choosing an entire side without inspecting it.
-- Update a file under `docs/handoffs/` when handing work to another machine or
-  agent. Include branch, commit, tests, failures, and changed interfaces.
+- Add or update a file under `docs/handoffs/` when handing work to another
+  machine or agent. Include branch, commit, tests, failures, and changed
+  interfaces.
 
 ## Canonical boundaries
 
