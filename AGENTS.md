@@ -44,7 +44,7 @@ python -m scripts.smoke_demo
 ```
 
 The frontend is Streamlit, not a separate JavaScript application. Start it with
-`streamlit run streamlit_app.py` and use **Load Northstar Demo** for the prepared
+`streamlit run streamlit_app.py` and use **Load Demo Case** for the prepared
 offline path.
 
 ## Data and safety

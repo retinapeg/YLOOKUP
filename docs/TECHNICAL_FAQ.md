@@ -1,4 +1,4 @@
-# Judge questions
+# Technical FAQ
 
 These answers describe the repository as implemented. The bundled data is entirely fictional, and the default benchmark is a deterministic synthetic regression run—not evidence of production or LLM performance.
 
@@ -64,7 +64,7 @@ The MVP does not include SSO, RBAC, tenant isolation, encrypted application stor
 
 ## How would you integrate with Excel?
 
-The repository contains a real, formatted synthetic XLSX register. In the flagship workbook the expected amount is **`LP Register!I2`** and the expected due date is **`LP Register!M2`**. The UI exposes those exact references and lets the judge download the workbook.
+The repository contains a real, formatted synthetic XLSX register. In the flagship workbook the expected amount is **`LP Register!I2`** and the expected due date is **`LP Register!M2`**. The UI exposes those exact references and lets the user download the workbook.
 
 The MVP does not ingest a live workbook: it loads a checked-in canonical JSON snapshot matching the synthetic row. A production connector would read a named Excel table through Microsoft Graph with least-privilege permissions and retain workbook ID, eTag/version, sheet, row key, and cell address as provenance. Any writeback would occur only after a human decision and would use optimistic concurrency. Reconciliation would remain deterministic Python code.
 
