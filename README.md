@@ -24,7 +24,7 @@ No API key or network access is needed after the dependencies are installed.
 
 ## System architecture
 
-![System architecture: analyst input, upload validation, deterministic extractor, reconciliation against a checked-in fund record, evidence reviewer, human exception queue and append-only SQLite audit log, with an optional OpenAI-compatible model and a fixture eval harness](docs/images/architecture.svg)
+![System architecture: analyst input, upload validation, deterministic extractor, reconciliation against a checked-in synthetic fund record, evidence reviewer, human exception queue and append-only SQLite audit log, with an optional OpenAI-compatible model and a fixture eval harness](docs/images/architecture.svg)
 
 *Purple: model call · blue: deterministic code · green: human · amber: evaluation · grey: storage · dashed: external, optional, mocked or planned*
 
@@ -36,7 +36,7 @@ The optional model boundary is limited to interpreting document text and indepen
 
 - **Off by default.** The offline demo and the fixture evaluation make no model calls. With `OPENAI_API_KEY` set, two sidebar checkboxes enable an OpenAI-compatible chat-completions model (`OPENAI_MODEL`, default `gpt-4.1-mini`, temperature 0, JSON output); see [Optional model mode](#optional-model-mode).
 - **Extraction.** The model receives the notice's page text and proposes fields. A field is kept only if it parses to the field's type, has a confidence between 0 and 1 and quotes evidence found on the cited page; otherwise the deterministic value or an explicit abstention is kept and a warning is shown.
-- **Evidence review.** The model receives one field's value, citation and reconciliation result and returns `SUPPORTED`, `CHALLENGE` or `INSUFFICIENT_EVIDENCE`. A failed call becomes `NOT_REVIEWED` and the row stays in the human queue.
+- **Evidence review.** The model receives one field's value, citation and reconciliation result and returns `SUPPORTED`, `CHALLENGE` or `INSUFFICIENT_EVIDENCE`. Local checks overrule a `SUPPORTED` verdict when the cited evidence negates the value, does not contain it or contains a competing value. A failed call becomes `NOT_REVIEWED` and the row stays in the human queue.
 - **What stays deterministic or human.** The model has no tools and no write access. Normalisation, `Decimal` comparisons, severities, exception states and audit writes are code, and only a person records Approved, Rejected or Needs investigation.
 - **Evaluation.** `--mode model` in the eval harness scores grounded model-origin fields separately from fallbacks, but no model-mode result is recorded; the published figures come from the deterministic path.
 

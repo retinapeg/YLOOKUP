@@ -3,12 +3,12 @@
 %% Render: npx @mermaid-js/mermaid-cli -i docs/architecture.mmd -o docs/images/architecture.svg -b white
 flowchart TD
     gold["Synthetic gold corpus<br/>27 cases, 270 fields"]
-    evals["Eval harness<br/>python -m app.evals"]
+    evals["Eval harness<br/>CLI + in-app Evals tab"]
     user["Analyst<br/>Load Demo Case or upload"]
     validate["Upload validation<br/>size, type, structure"]
     extract["Deterministic extractor<br/>labelled fields + page cite"]
-    llm["Optional LLM endpoint<br/>OpenAI-compatible, key only"]
-    record[("Fund record<br/>checked-in JSON row")]
+    llm["Optional LLM endpoint<br/>OpenAI-compatible, opt-in"]
+    record[("Synthetic fund record<br/>checked-in JSON row")]
     recon["Reconciliation<br/>Decimal, dates, severity"]
     review["Evidence reviewer<br/>deterministic by default"]
     decide["Exception queue<br/>human decision + reason"]
@@ -29,7 +29,7 @@ flowchart TD
 
     class user,decide human;
     class validate,extract,recon,review det;
-    class llm ext;
+    class llm ai;
     class record,audit store;
     class gold mock;
     class evals eval;
