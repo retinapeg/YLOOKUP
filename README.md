@@ -2,6 +2,10 @@
 
 Offline-first capital-call reconciliation for private-markets fund operations. It reads a capital-call notice (PDF or TXT), extracts typed fields with page-level evidence, checks them against the investor register with deterministic controls, runs an independent evidence review, and records the human decision in an append-only SQLite audit log. It is a single-process Streamlit app built as a hackathon project; every fund, investor and amount in the repository is fictional.
 
+![FundOps Control Room after Load Demo Case: the Northstar notice shows GBP 650,000 against an expected GBP 625,000, a high-severity GBP +25,000 deterministic variance and two exceptions awaiting a human decision](docs/images/demo-case.png)
+
+*The Streamlit app running locally with no API key, after clicking **Load Demo Case**. The Northstar fund, investor and amounts are synthetic.*
+
 - **Grounding rule.** In the optional model mode, a model-returned field is kept only if its quoted evidence text appears on the page it cites (case-insensitive, whitespace-normalised match in `_ground_evidence`, [`app/extraction.py`](app/extraction.py)). Otherwise the field is discarded, the deterministic value is kept where one exists and a warning is shown.
 - **Deterministic controls.** Amounts are compared as Python `Decimal` values with zero tolerance by default; dates, currency, references, missing values and a 0.80 confidence threshold are fixed rules ([`app/reconciliation.py`](app/reconciliation.py)). No model can clear a control break or make the decision.
 - **Evaluation harness.** `python -m app.evals` runs the current extraction, reconciliation and reviewer code over 27 synthetic cases (270 labelled fields) with 4 count-based regression gates. Current fixture result: **267/270** fields extracted exactly, **12/12** gold exceptions found at 12/14 precision, **210/210** isolated rule outcomes correct, **4/4** gates pass.
@@ -17,6 +21,24 @@ streamlit run streamlit_app.py                             # then click "Load De
 ```
 
 No API key or network access is needed after the dependencies are installed.
+
+## System architecture
+
+![System architecture: analyst input, upload validation, deterministic extractor, reconciliation against a checked-in fund record, evidence reviewer, human exception queue and append-only SQLite audit log, with an optional OpenAI-compatible model and a fixture eval harness](docs/images/architecture.svg)
+
+*Purple: model call · blue: deterministic code · green: human · amber: evaluation · grey: storage · dashed: external, optional, mocked or planned*
+
+An analyst loads the synthetic Northstar demo or uploads a text-based PDF/TXT notice; after bounded validation, the deterministic label parser extracts typed fields with page-level evidence. Reconciliation compares those fields with a checked-in canonical JSON fund record using `Decimal` and date rules (the XLSX register is shown and downloadable but not parsed live), and the evidence reviewer then checks each field's citation as a separate step. Rows that break a control or lack supporting evidence go to the exception queue, where a human decision and reason are appended to the SQLite audit log, while the eval harness replays the same extraction, reconciliation and review code over the synthetic gold corpus. Diagram source: [`docs/architecture.mmd`](docs/architecture.mmd).
+
+The optional model boundary is limited to interpreting document text and independently reviewing cited evidence. Typed normalisation, financial comparisons, severities, exception states and audit writes remain deterministic. Module boundaries are documented in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the canonical interfaces in [docs/AGENT_CONTRACTS.md](docs/AGENT_CONTRACTS.md). Design questions (why an LLM at all, hallucination handling, scaling, what is implemented versus mocked) are answered in [docs/TECHNICAL_FAQ.md](docs/TECHNICAL_FAQ.md).
+
+## How AI is used
+
+- **Off by default.** The offline demo and the fixture evaluation make no model calls. With `OPENAI_API_KEY` set, two sidebar checkboxes enable an OpenAI-compatible chat-completions model (`OPENAI_MODEL`, default `gpt-4.1-mini`, temperature 0, JSON output); see [Optional model mode](#optional-model-mode).
+- **Extraction.** The model receives the notice's page text and proposes fields. A field is kept only if it parses to the field's type, has a confidence between 0 and 1 and quotes evidence found on the cited page; otherwise the deterministic value or an explicit abstention is kept and a warning is shown.
+- **Evidence review.** The model receives one field's value, citation and reconciliation result and returns `SUPPORTED`, `CHALLENGE` or `INSUFFICIENT_EVIDENCE`. A failed call becomes `NOT_REVIEWED` and the row stays in the human queue.
+- **What stays deterministic or human.** The model has no tools and no write access. Normalisation, `Decimal` comparisons, severities, exception states and audit writes are code, and only a person records Approved, Rejected or Needs investigation.
+- **Evaluation.** `--mode model` in the eval harness scores grounded model-origin fields separately from fallbacks, but no model-mode result is recorded; the published figures come from the deterministic path.
 
 ## Requirements
 
@@ -37,31 +59,6 @@ The audit database defaults to `data/fundops.db`. To start from an empty audit l
 ```bash
 FUNDOPS_DB_PATH="$(mktemp -d)/audit.db" streamlit run streamlit_app.py
 ```
-
-## Architecture
-
-```mermaid
-flowchart LR
-    A[Capital-call PDF or TXT] --> B[Bounded upload validation]
-    B --> C[Structured extraction]
-    C --> D[Field-level provenance]
-    D --> E[Deterministic normalisation]
-    F[XLSX register plus canonical snapshot] --> G[FundRecord]
-    E --> H[Deterministic reconciliation]
-    G --> H
-    H --> I[Independent evidence review]
-    I --> J[Exception queue]
-    J --> K[Human decision]
-    K --> L[(Append-only audit history)]
-
-    M[Versioned synthetic corpus] --> N[Evaluation runner]
-    N --> C
-    N --> H
-    N --> I
-    N --> O[Generated metrics and failed cases]
-```
-
-The optional model boundary is limited to interpreting document text and independently reviewing cited evidence. Typed normalisation, financial comparisons, severities, exception states and audit writes remain deterministic. Module boundaries are documented in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the canonical interfaces in [docs/AGENT_CONTRACTS.md](docs/AGENT_CONTRACTS.md). Design questions (why an LLM at all, hallucination handling, scaling, what is implemented versus mocked) are answered in [docs/TECHNICAL_FAQ.md](docs/TECHNICAL_FAQ.md).
 
 ## Why deterministic reconciliation is separate from LLM interpretation
 

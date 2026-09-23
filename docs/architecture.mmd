@@ -1,0 +1,43 @@
+%% Architecture of YLOOKUP at commit 0a0043b984beeeb300379264666bc59aa5a12c97
+%% Sources: streamlit_app.py, app/file_handling.py, app/extraction.py, app/sample_data.py, app/reconciliation.py, app/review.py, app/storage.py, app/evals/runner.py, app/evals/schema.py, app/evals/telemetry.py
+%% Render: npx @mermaid-js/mermaid-cli -i docs/architecture.mmd -o docs/images/architecture.svg -b white
+flowchart TD
+    gold["Synthetic gold corpus<br/>27 cases, 270 fields"]
+    evals["Eval harness<br/>python -m app.evals"]
+    user["Analyst<br/>Load Demo Case or upload"]
+    validate["Upload validation<br/>size, type, structure"]
+    extract["Deterministic extractor<br/>labelled fields + page cite"]
+    llm["Optional LLM endpoint<br/>OpenAI-compatible, key only"]
+    record[("Fund record<br/>checked-in JSON row")]
+    recon["Reconciliation<br/>Decimal, dates, severity"]
+    review["Evidence reviewer<br/>deterministic by default"]
+    decide["Exception queue<br/>human decision + reason"]
+    audit[("SQLite audit log<br/>append-only")]
+
+    user -->|"PDF / TXT"| validate --> extract
+    extract -->|"typed fields"| recon
+    record --> recon
+    recon -->|"status per field"| review
+    review --> decide
+    decide -->|"append event"| audit
+    llm -.->|"grounded fields"| extract
+    llm -.->|"per-field verdict"| review
+    gold --> evals
+    evals -.->|"replays current code"| extract
+    evals -.-> recon
+    evals -.-> review
+
+    class user,decide human;
+    class validate,extract,recon,review det;
+    class llm ext;
+    class record,audit store;
+    class gold mock;
+    class evals eval;
+
+    classDef ai fill:#efe7fb,stroke:#6a4c93,stroke-width:2px,color:#2b1d45;
+    classDef det fill:#eef3f8,stroke:#2f5d8a,stroke-width:1.5px,color:#172c37;
+    classDef human fill:#e8f0ec,stroke:#285b48,stroke-width:1.5px,color:#173f32;
+    classDef eval fill:#f7efdf,stroke:#8b6330,stroke-width:1.5px,color:#4a3413;
+    classDef store fill:#f3f4f1,stroke:#65757b,stroke-width:1.5px,color:#172c37;
+    classDef ext fill:#ffffff,stroke:#2f5d8a,stroke-width:1.5px,stroke-dasharray:4 3,color:#172c37;
+    classDef mock fill:#ffffff,stroke:#9aa5a8,stroke-width:1.5px,stroke-dasharray:6 4,color:#65757b;
