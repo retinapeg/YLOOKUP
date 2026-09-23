@@ -1,5 +1,7 @@
 # FundOps Control Room (YLOOKUP)
 
+[![tests](https://github.com/retinapeg/YLOOKUP/actions/workflows/ci.yml/badge.svg)](https://github.com/retinapeg/YLOOKUP/actions/workflows/ci.yml)
+
 Offline-first capital-call reconciliation for private-markets fund operations. It reads a capital-call notice (PDF or TXT), extracts typed fields with page-level evidence, checks them against the investor register with deterministic controls, runs an independent evidence review, and records the human decision in an append-only SQLite audit log. It is a single-process Streamlit app built as a hackathon project; every fund, investor and amount in the repository is fictional.
 
 ![FundOps Control Room after Load Demo Case: the Northstar notice shows GBP 650,000 against an expected GBP 625,000, a high-severity GBP +25,000 deterministic variance and two exceptions awaiting a human decision](docs/images/demo-case.png)
