@@ -131,4 +131,4 @@ The smoke script runs the clean-match and Northstar cases, the no-key model fall
 
 ## Development
 
-Development was AI-assisted: coding agents worked to the conventions in [AGENTS.md](AGENTS.md), which sets the module boundaries and the rule that a model may interpret source text but must not perform financial arithmetic, clear a control break or make a human decision.
+Changes extend the single canonical module for each concern listed in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#canonical-module-ownership) rather than adding parallel implementations, and follow the [integration rules](docs/AGENT_CONTRACTS.md#integration-rules) that keep model interpretation, deterministic controls, evidence review and human decisions as separate authorities: a model may interpret source text but must not perform financial arithmetic, clear a control break or make a human decision. CI runs the offline test suite and the fixture evaluation with regression gates on every push and pull request.
