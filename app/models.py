@@ -11,6 +11,9 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
+from .retrieval import RetrievalResult
+
+
 class DocumentType(str, Enum):
     CAPITAL_CALL = "CAPITAL_CALL"
     DISTRIBUTION_NOTICE = "DISTRIBUTION_NOTICE"
@@ -139,6 +142,8 @@ class ExtractedDocument(DomainModel):
     fields: Dict[str, ExtractedField] = Field(default_factory=dict)
     extraction_method: ExtractionMethod = ExtractionMethod.DETERMINISTIC
     warnings: List[str] = Field(default_factory=list)
+
+    retrieval: Optional[RetrievalResult] = None
 
     def value_for(self, field_name: str) -> FieldValue:
         extracted = self.fields.get(field_name)

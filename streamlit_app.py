@@ -18,11 +18,12 @@ import streamlit as st
 
 from app.errors import WorkflowError, WorkflowErrorCode, WorkflowStage
 from app.evals import EvaluationConfig, run_evaluation
-from app.extraction import OpenAICompatibleExtractor, extract_document
+from app.extraction import DeterministicExtractor, OpenAICompatibleExtractor, extract_document
 from app.file_handling import temporary_upload, validate_upload
 from app.models import AuditEvent, ReviewDecision
 from app.observability import new_request_id, observe_workflow_stage
 from app.reconciliation import reconcile_document
+from app.retrieval import EmbeddingRetriever
 from app.review import OpenAICompatibleEvidenceReviewer, review_reconciliation
 from app.sample_data import (
     DEMO_FILES,
@@ -585,6 +586,9 @@ def _document_scope_id(content: bytes, record: Any, document: Any) -> str:
             mode="json",
             exclude={"fields": {"__all__": {"timestamp"}}},
         )
+        # Preserve pre-retrieval audit digests for full-document runs.
+        if extraction_data.get("retrieval") is None:
+            extraction_data.pop("retrieval", None)
         extraction_payload = json.dumps(
             extraction_data,
             sort_keys=True,
@@ -603,13 +607,14 @@ def _scope_token() -> str:
     return hashlib.sha256(document_id.encode("utf-8")).hexdigest()[:12]
 
 
-def _selected_extractor() -> Optional[OpenAICompatibleExtractor]:
-    if not st.session_state.get("use_ai_extraction", False):
-        return None
-    # The adapter owns its deterministic fallback. Constructing it without a
-    # key is safe and keeps a stale/externally restored UI selection from
-    # crashing the offline workflow.
-    return OpenAICompatibleExtractor()
+def _selected_extractor():
+    retrieval_mode = bool(st.session_state.get("retrieval_mode", False))
+    backend = EmbeddingRetriever() if retrieval_mode and st.session_state.get("embedding_mode") else None
+    if st.session_state.get("use_ai_extraction", False):
+        return OpenAICompatibleExtractor(retrieval_mode=retrieval_mode, retriever=backend)
+    if retrieval_mode:
+        return DeterministicExtractor(retrieval_mode=True, retriever=backend)
+    return None
 
 
 def _selected_reviewer() -> Optional[OpenAICompatibleEvidenceReviewer]:
@@ -622,9 +627,9 @@ def _selected_reviewer() -> Optional[OpenAICompatibleEvidenceReviewer]:
 
 
 def _extraction_stage(
-    extractor: Optional[OpenAICompatibleExtractor],
+    extractor: Optional[OpenAICompatibleExtractor | DeterministicExtractor],
 ) -> WorkflowStage:
-    if extractor is not None and extractor.available:
+    if isinstance(extractor, OpenAICompatibleExtractor) and extractor.available:
         return WorkflowStage.AI_EXTRACTION
     return WorkflowStage.DETERMINISTIC_EXTRACTION
 
@@ -787,6 +792,8 @@ def _capture_upload_error(
         if isinstance(error, WorkflowError)
         else "The workflow could not be completed. Check the package and try again."
     )
+    if isinstance(error, NotImplementedError) and st.session_state.get("retrieval_mode"):
+        message = "Retrieval maths is unfinished. Select full-document extraction to process this notice."
     correlation_id = request_id or (
         error.request_id if isinstance(error, WorkflowError) else new_request_id()
     )
@@ -857,6 +864,10 @@ def _render_sidebar() -> None:
         _render_upload_error()
 
         st.markdown('<div class="rail-label">OPTIONAL MODEL MODES</div>', unsafe_allow_html=True)
+        if st.toggle("Use retrieval for extraction", key="retrieval_mode",
+                     help="Off uses the full document. On selects evidence separately for each field."):
+            st.checkbox("Use embedding retrieval", key="embedding_mode",
+                        help="Sends document chunks and field queries to the configured embeddings endpoint.")
         ai_available = bool(os.getenv("OPENAI_API_KEY"))
         st.checkbox(
             "Use OpenAI-compatible extraction",
@@ -1997,6 +2008,16 @@ def _render_extraction_ledger(document: Any) -> None:
         with st.expander(
             f"{_field_label(name)} · {_format_value(name, getattr(extracted, 'value', None), observed_currency)}"
         ):
+            trace = getattr(document, "retrieval", None)
+            if trace is not None:
+                st.caption(f"Retrieved evidence · {trace.backend}")
+                for rank, hit in enumerate(trace.fields.get(name, []), 1):
+                    chunk = hit.chunk
+                    st.caption(f"Rank {rank} · Page {chunk.page} · Chunk {chunk.chunk_id} · "
+                               f"Score {hit.score:.4f} · Characters {chunk.start}–{chunk.end}")
+                    st.text(chunk.text)
+                if extracted.abstention_reason:
+                    st.caption(extracted.abstention_reason)
             meta = st.columns(4)
             meta[0].metric("Source", _display_source_name(getattr(extracted, "source", "Unavailable")))
             meta[1].metric("Location", _source_location(extracted))
