@@ -89,6 +89,14 @@ Consumers must turn normalization errors into `REVIEW` or an explicit extraction
 
 ## Workflow interfaces
 
+### Retrieval
+
+`app/retrieval.py` owns `chunk_pages(doc_id, pages, size=80, overlap=20)`, the ordered `FIELD_QUERIES` configuration, and the `Retriever` protocol. Its method `retrieve(chunks, queries, k) -> RetrievalResult` returns the actual backend name, ranked hits per field, and warnings. A hit has a score and a chunk. Offsets are Python string indices on the original numbered page, with an exclusive end. Chunk IDs follow source order within a single document.
+
+`TfidfRetriever` works locally. `EmbeddingRetriever` reads `OPENAI_API_KEY`, `OPENAI_BASE_URL` and `OPENAI_EMBEDDING_MODEL` (default `text-embedding-3-small`) and uses `POST /embeddings`. It reorders each response by input index and rejects incomplete/non-finite vectors. A missing key produces a TF-IDF result with a warning. A failed live request surfaces as an error. Fixture evaluation always runs locally.
+
+The four signatures and numerical edge cases are defined in the docstrings of `tfidf_matrix`, `cosine_sim`, `top_k` and `recall_at_k`. Their production bodies are reserved for Leo. Production modules must never import test reference maths.
+
 ### Extraction
 
 ```python
@@ -96,6 +104,17 @@ extract_document(path, *, extractor=None, case_id=None) -> ExtractedDocument
 ```
 
 The default extractor is deterministic and offline. The optional OpenAI-compatible extractor uses the same result contract. Model fields are accepted only when their page, evidence occurrence, confidence, field name, and typed value validate. Provider absence or invalid output returns a disclosed deterministic fallback when one is available.
+
+Both extractor constructors accept `retrieval_mode`, `retriever`, `chunk_size`, `overlap`, and `top_k`. For example:
+
+```python
+extractor = DeterministicExtractor(retrieval_mode=True, chunk_size=80, overlap=20, top_k=5)
+document = extract_document(path, extractor=extractor, case_id=case_id)
+```
+
+With retrieval enabled, `ExtractedDocument.retrieval` holds the ranked hits for every field. A missing or conflicting value yields an explicit field-level abstention. The model receives one field request at a time with just its selected evidence. It must cite a source line on a selected page and return a literal that parses to the proposed typed value. A response for another field is ignored. A failed or unsupported response preserves that field’s scoped deterministic value or abstention. A deterministic conflict cannot be overridden.
+
+Full-document mode (`retrieval_mode=False`, currently the default) preserves the existing prompt and fixture behavior. The optional retrieval trace is omitted from legacy document digest inputs when absent so previously recorded decisions retain their scope.
 
 ### Reconciliation
 

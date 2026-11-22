@@ -14,7 +14,11 @@ flowchart TD
 
     P --> V[Validate size, suffix, MIME, and structure]
     V --> T[Random temporary file]
-    T --> E[Structured extraction]
+    T --> PAGES[Numbered source pages]
+    PAGES -->|Full document| E[Structured extraction]
+    PAGES -->|Retrieval mode| CH[Page-local word windows]
+    CH --> RET[Rank chunks separately for each field]
+    RET -->|Field-specific evidence only| E
     E --> PR[Typed value plus provenance]
     PR --> N[Deterministic normalization]
     X -. displayed and downloadable fixture .-> J
@@ -45,6 +49,7 @@ The XLSX file is a genuine synthetic workbook and its relevant cell addresses ar
 | --- | --- | --- |
 | Domain types | `app/models.py` | Pydantic records, extracted fields, reconciliation results, and human audit events |
 | Deterministic normalization | `app/normalization.py` | Fail-closed monetary and currency normalization used by financial controls |
+| Retrieval | `app/retrieval.py` | Page-local chunks, field queries, offline TF-IDF, optional embeddings, and ranked evidence |
 | Extraction | `app/extraction.py` | PDF/TXT reading, labelled deterministic extraction, and optional grounded model extraction |
 | Reconciliation | `app/reconciliation.py` | Exact expected-versus-observed controls, status, severity, and difference calculation |
 | Independent review | `app/review.py` | Evidence-only findings that cannot mutate or clear reconciliation |
@@ -62,6 +67,14 @@ There is one implementation for each concern. Compatibility names such as `Recon
 ### Input and temporary storage
 
 Uploads are checked before parsing. The application accepts only allowlisted formats, applies a 10 MiB limit, checks signatures/package structure, writes to a random temporary location, and deletes that copy after processing. Original bytes remain only in active Streamlit session state so the user can download the source during the demo.
+
+### Retrieval scope and evidence
+
+Full-document mode remains the startup setting while the four maths functions await hand implementation. In retrieval mode, the configured retriever ranks chunks from **one document** for each of ten field queries. The default is TF-IDF. Both chunk and query vectors use the term weights fitted to that document. An optional embeddings adapter batches chunks and queries at the configured OpenAI-compatible endpoint. Selecting embeddings without a key uses TF-IDF and reports the substitution.
+
+Windows default to 80 whitespace-delimited words with 20 words of overlap. Each window keeps its exact page substring, half-open character offsets, one-based page, zero-based chunk ID and source document digest. The two extractors consume complete source lines within the selected windows to avoid treating clipped labels or amounts as complete evidence. Each proposed field and any fallback stay within the same selection. The extraction ledger displays the raw ranked windows, including clipped edges, and their scores. The current session retains this trace. Human audit events continue to store the field snapshot and citation.
+
+Production calls the maths functions directly. They deliberately raise `NotImplementedError` pending hand implementation. The test-only switch and its reference functions live in `tests/_reference_retrieval.py`. See the [implementation handoff](handoffs/rag-ingestion.md) for commands and measured results.
 
 ### Optional model extraction
 
@@ -82,6 +95,8 @@ The exception UI requires a reason before recording `APPROVED`, `REJECTED`, or `
 ## Evaluation path
 
 `python -m app.evals --mode fixture --fail-on-regression` verifies fixture hashes and runs the same extraction, reconciliation, and reviewer implementations used by the demo. The result artifact contains its dataset digest, environment metadata, explicit supports, provider telemetry, regression-gate policy, and ranked failed cases. Isolated rule correctness injects gold extracted values to distinguish reconciliation defects from upstream extraction defects.
+
+The separate long-pack benchmark (`python -m app.evals.retrieval`) runs deterministic extraction on both paths. It scores page recall at chunk ranks 1, 3 and 5, exact normalized field values, and top-ranked decoy pages. It evaluates embeddings when a key is present unless `--offline` is set. Gold metadata is used only for scoring. The existing fixture command retains its full-document baseline.
 
 Fixture mode is a deterministic regression baseline and makes no model calls. Model mode keeps grounded model-origin fields separate from deterministic fallback and fill-ins. Neither mode establishes production accuracy without a permissioned representative dataset and an appropriate statistical design.
 
