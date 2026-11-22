@@ -866,8 +866,10 @@ def _render_sidebar() -> None:
         st.markdown('<div class="rail-label">OPTIONAL MODEL MODES</div>', unsafe_allow_html=True)
         if st.toggle("Use retrieval for extraction", key="retrieval_mode",
                      help="Off uses the full document. On selects evidence separately for each field."):
-            st.checkbox("Use embedding retrieval", key="embedding_mode",
+            embedding_mode = st.checkbox("Use embedding retrieval", key="embedding_mode",
                         help="Sends document chunks and field queries to the configured embeddings endpoint.")
+            if embedding_mode and not os.getenv("OPENAI_API_KEY"):
+                st.info("No embeddings key is configured. Retrieval will use offline TF-IDF.")
         ai_available = bool(os.getenv("OPENAI_API_KEY"))
         st.checkbox(
             "Use OpenAI-compatible extraction",

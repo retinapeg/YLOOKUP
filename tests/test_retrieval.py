@@ -105,3 +105,40 @@ def test_retrieval_ui_renders_scored_chunks(tmp_path, monkeypatch):
         assert app.session_state["document"].retrieval.backend == "tfidf"
         assert any("Score" in c.value and "Page" in c.value for c in app.caption)
         assert any("Capital Call Amount:" in block.value for block in app.text)
+
+
+def test_other_field_quote_and_partial_amount_cannot_support_model_value(tmp_path):
+    from app.extraction import OpenAICompatibleExtractor
+    path = tmp_path / "sample.txt"
+    path.write_text("The contribution remains GBP 25,000 at year end.\nManagement Fee: GBP 40\n")
+
+    def model(prompt):
+        if prompt.startswith("Extract only capital_call_amount."):
+            return {"fields": {"capital_call_amount": {"value": 40, "page": 1, "confidence": 1,
+                                                       "evidence": "GBP 40"}}}
+        if prompt.startswith("Extract only commitment_amount."):
+            return {"fields": {"commitment_amount": {"value": 25, "page": 1, "confidence": 1,
+                                                     "evidence": "GBP 25"}}}
+        return {}
+
+    with reference_maths():
+        doc = OpenAICompatibleExtractor(retrieval_mode=True, transport=model).extract(path)
+    assert doc.fields["capital_call_amount"].value is None
+    assert doc.fields["commitment_amount"].value is None
+
+
+def test_positive_model_only_field_uses_literal_from_selected_prose(tmp_path):
+    from app.extraction import OpenAICompatibleExtractor
+    from app.models import ExtractionMethod
+    path = tmp_path / "notice.txt"
+    path.write_text("The management fee for this quarter is GBP 2,500.00.")
+    def model(prompt):
+        if prompt.startswith("Extract only management_fee."):
+            return {"fields": {"management_fee": {"value": "2500.00", "source_value": "GBP 2,500.00",
+                "page": 1, "confidence": .8, "evidence": "management fee for this quarter is GBP 2,500.00."}}}
+        return {}
+    with reference_maths():
+        doc = OpenAICompatibleExtractor(retrieval_mode=True, transport=model).extract(path)
+    field = doc.fields["management_fee"]
+    assert field.value == 2500 and field.page == 1
+    assert field.method is ExtractionMethod.OPENAI_COMPATIBLE and not field.abstention_reason
