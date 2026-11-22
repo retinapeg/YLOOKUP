@@ -1,0 +1,617 @@
+{
+  "synthetic": true,
+  "packs": [
+    {
+      "file": "pack-01.txt",
+      "source_case": "CC-001",
+      "source": "data/sample_documents/matching_capital_call.txt",
+      "pages": 20,
+      "decoy_pages": [],
+      "gold": {
+        "fund_name": {
+          "value": "Northstar Growth Fund II",
+          "page": 5
+        },
+        "investor_name": {
+          "value": "Albion Capital Partners",
+          "page": 5
+        },
+        "commitment_amount": {
+          "value": "5000000.00",
+          "page": 5
+        },
+        "capital_call_amount": {
+          "value": "625000.00",
+          "page": 5
+        },
+        "call_date": {
+          "value": "2026-09-04",
+          "page": 6
+        },
+        "due_date": {
+          "value": "2026-09-18",
+          "page": 6
+        },
+        "currency": {
+          "value": "GBP",
+          "page": 6
+        },
+        "bank_account_reference": {
+          "value": "NSGFII-ALB-CC04",
+          "page": 6
+        },
+        "management_fee": {
+          "value": "25000.00",
+          "page": 6
+        },
+        "document_type": {
+          "value": "CAPITAL_CALL",
+          "page": 5
+        }
+      },
+      "sha256": "8d133fdd205d3a6e1f32c9415bca706769f678842d853e6773fad86c60d8f726"
+    },
+    {
+      "file": "pack-02.txt",
+      "source_case": "CC-002",
+      "source": "data/demo/northstar_growth_fund_ii/capital_call_notice.txt",
+      "pages": 33,
+      "decoy_pages": [
+        11
+      ],
+      "gold": {
+        "fund_name": {
+          "value": "Northstar Growth Fund II",
+          "page": 12
+        },
+        "investor_name": {
+          "value": "Alderstone Civic Pension Partnership",
+          "page": 12
+        },
+        "commitment_amount": {
+          "value": "25000000.00",
+          "page": 12
+        },
+        "capital_call_amount": {
+          "value": "650000.00",
+          "page": 12
+        },
+        "call_date": {
+          "value": "2026-09-04",
+          "page": 12
+        },
+        "due_date": {
+          "value": "2026-09-28",
+          "page": 12
+        },
+        "currency": {
+          "value": "GBP",
+          "page": 12
+        },
+        "bank_account_reference": {
+          "value": "NSGFII-ALD-CC04",
+          "page": 12
+        },
+        "management_fee": {
+          "value": "25000.00",
+          "page": 12
+        },
+        "document_type": {
+          "value": "CAPITAL_CALL",
+          "page": 12
+        }
+      },
+      "sha256": "c5be6c09b23898911b23ab08ae3e3f3a1b894ba70ddbb16cbaa59397d4929043"
+    },
+    {
+      "file": "pack-03.txt",
+      "source_case": "CC-003",
+      "source": "data/evals/notices/cc-003_currency_mismatch.txt",
+      "pages": 25,
+      "decoy_pages": [],
+      "gold": {
+        "fund_name": {
+          "value": "Juniper Ridge Private Credit III",
+          "page": 19
+        },
+        "investor_name": {
+          "value": "Wrenford Mutual Assurance Pool",
+          "page": 19
+        },
+        "commitment_amount": {
+          "value": "10000000.00",
+          "page": 19
+        },
+        "capital_call_amount": {
+          "value": "625000.00",
+          "page": 19
+        },
+        "call_date": {
+          "value": "2026-09-04",
+          "page": 19
+        },
+        "due_date": {
+          "value": "2026-09-25",
+          "page": 19
+        },
+        "currency": {
+          "value": "USD",
+          "page": 19
+        },
+        "bank_account_reference": {
+          "value": "JRPC3-WRE-CC06",
+          "page": 19
+        },
+        "management_fee": {
+          "value": null,
+          "page": null
+        },
+        "document_type": {
+          "value": "CAPITAL_CALL",
+          "page": 19
+        }
+      },
+      "sha256": "3fab069f63958e31f412238af538fd9573710daddbbb56c578c558d5bdc28481"
+    },
+    {
+      "file": "pack-04.txt",
+      "source_case": "CC-004",
+      "source": "data/evals/notices/cc-004_due_date_mismatch.txt",
+      "pages": 38,
+      "decoy_pages": [
+        29
+      ],
+      "gold": {
+        "fund_name": {
+          "value": "Harbourlight Secondaries IV",
+          "page": 26
+        },
+        "investor_name": {
+          "value": "Calder Fen Borough Retirement Scheme",
+          "page": 26
+        },
+        "commitment_amount": {
+          "value": "18000000.00",
+          "page": 26
+        },
+        "capital_call_amount": {
+          "value": "450000.00",
+          "page": 26
+        },
+        "call_date": {
+          "value": "2026-09-30",
+          "page": 27
+        },
+        "due_date": {
+          "value": "2026-10-22",
+          "page": 27
+        },
+        "currency": {
+          "value": "GBP",
+          "page": 27
+        },
+        "bank_account_reference": {
+          "value": "HS4-CFB-CC09",
+          "page": 27
+        },
+        "management_fee": {
+          "value": null,
+          "page": null
+        },
+        "document_type": {
+          "value": "CAPITAL_CALL",
+          "page": 27
+        }
+      },
+      "sha256": "0c026e1cce7738c441ff051d74c1b0f19305905d0e471187e85ad7e3dbe4b785"
+    },
+    {
+      "file": "pack-05.txt",
+      "source_case": "CC-006",
+      "source": "data/evals/notices/cc-006_commitment_omitted_from_notice.txt",
+      "pages": 30,
+      "decoy_pages": [],
+      "gold": {
+        "fund_name": {
+          "value": "Redwood Arc Ventures III",
+          "page": 7
+        },
+        "investor_name": {
+          "value": "Ashcombe University Endowment",
+          "page": 7
+        },
+        "commitment_amount": {
+          "value": null,
+          "page": null
+        },
+        "capital_call_amount": {
+          "value": "360000.00",
+          "page": 7
+        },
+        "call_date": {
+          "value": "2026-09-04",
+          "page": 7
+        },
+        "due_date": {
+          "value": "2026-09-24",
+          "page": 7
+        },
+        "currency": {
+          "value": "GBP",
+          "page": 7
+        },
+        "bank_account_reference": {
+          "value": "RAV3-AUE-CC05",
+          "page": 7
+        },
+        "management_fee": {
+          "value": null,
+          "page": null
+        },
+        "document_type": {
+          "value": "CAPITAL_CALL",
+          "page": 7
+        }
+      },
+      "sha256": "46da263a731598d2c69b707f0be6d07c03ba5234efa5f732872a1603b828d98f"
+    },
+    {
+      "file": "pack-06.txt",
+      "source_case": "CC-009",
+      "source": "data/evals/notices/cc-009_european_comma_decimal_formatting.txt",
+      "pages": 22,
+      "decoy_pages": [
+        3
+      ],
+      "gold": {
+        "fund_name": {
+          "value": "Kestrel Ridge Opportunities II",
+          "page": 4
+        },
+        "investor_name": {
+          "value": "Morrowgate Insurance Reserve",
+          "page": 4
+        },
+        "commitment_amount": {
+          "value": "10000000.00",
+          "page": 4
+        },
+        "capital_call_amount": {
+          "value": "625000.00",
+          "page": 4
+        },
+        "call_date": {
+          "value": "2026-09-04",
+          "page": 4
+        },
+        "due_date": {
+          "value": "2026-09-21",
+          "page": 4
+        },
+        "currency": {
+          "value": "GBP",
+          "page": 4
+        },
+        "bank_account_reference": {
+          "value": "KRO2-MIR-CC06",
+          "page": 4
+        },
+        "management_fee": {
+          "value": null,
+          "page": null
+        },
+        "document_type": {
+          "value": "CAPITAL_CALL",
+          "page": 4
+        }
+      },
+      "sha256": "b016954540267bcd6c4dd388e32c0f2570631b82c0c6e4eba7c370fbd264df06"
+    },
+    {
+      "file": "pack-07.txt",
+      "source_case": "CC-010",
+      "source": "data/evals/notices/cc-010_parenthetical_negative_amount.txt",
+      "pages": 35,
+      "decoy_pages": [],
+      "gold": {
+        "fund_name": {
+          "value": "Beacon Strand Co-Investment I",
+          "page": 17
+        },
+        "investor_name": {
+          "value": "Ellington Science Foundation",
+          "page": 17
+        },
+        "commitment_amount": {
+          "value": "5000000.00",
+          "page": 17
+        },
+        "capital_call_amount": {
+          "value": "-125000.00",
+          "page": 17
+        },
+        "call_date": {
+          "value": "2026-09-04",
+          "page": 18
+        },
+        "due_date": {
+          "value": "2026-09-22",
+          "page": 18
+        },
+        "currency": {
+          "value": "GBP",
+          "page": 18
+        },
+        "bank_account_reference": {
+          "value": "BSC1-ESF-CC02",
+          "page": 18
+        },
+        "management_fee": {
+          "value": null,
+          "page": null
+        },
+        "document_type": {
+          "value": "CAPITAL_CALL",
+          "page": 18
+        }
+      },
+      "sha256": "1c05202017607e650bf68cf27bb6b5d128f7f929121ba7f1a01dea991eed14f7"
+    },
+    {
+      "file": "pack-08.txt",
+      "source_case": "CC-013",
+      "source": "data/evals/notices/cc-013_stale_previous_call_amount.txt",
+      "pages": 27,
+      "decoy_pages": [
+        13
+      ],
+      "gold": {
+        "fund_name": {
+          "value": "Northstar Growth Fund II",
+          "page": 10
+        },
+        "investor_name": {
+          "value": "Rosemere College Endowment",
+          "page": 10
+        },
+        "commitment_amount": {
+          "value": "25000000.00",
+          "page": 10
+        },
+        "capital_call_amount": {
+          "value": "625000.00",
+          "page": 10
+        },
+        "call_date": {
+          "value": "2026-09-04",
+          "page": 10
+        },
+        "due_date": {
+          "value": "2026-09-30",
+          "page": 10
+        },
+        "currency": {
+          "value": "GBP",
+          "page": 10
+        },
+        "bank_account_reference": {
+          "value": "NSGFII-RCE-CC05",
+          "page": 10
+        },
+        "management_fee": {
+          "value": null,
+          "page": null
+        },
+        "document_type": {
+          "value": "CAPITAL_CALL",
+          "page": 10
+        }
+      },
+      "sha256": "e83aec9fed372e89168d253e641432a6d532e5a37e8313fb6d8832a9810ce3bb"
+    },
+    {
+      "file": "pack-09.txt",
+      "source_case": "CC-015",
+      "source": "data/evals/notices/cc-015_mixed_date_formats.txt",
+      "pages": 40,
+      "decoy_pages": [],
+      "gold": {
+        "fund_name": {
+          "value": "Oak Meridian Continuation Fund I",
+          "page": 25
+        },
+        "investor_name": {
+          "value": "Dunmarsh Public Service Pension Pool",
+          "page": 25
+        },
+        "commitment_amount": {
+          "value": "14000000.00",
+          "page": 25
+        },
+        "capital_call_amount": {
+          "value": "350000.00",
+          "page": 25
+        },
+        "call_date": {
+          "value": "2026-09-04",
+          "page": 25
+        },
+        "due_date": {
+          "value": "2026-09-30",
+          "page": 25
+        },
+        "currency": {
+          "value": "GBP",
+          "page": 25
+        },
+        "bank_account_reference": {
+          "value": "OMC1-DPS-CC03",
+          "page": 25
+        },
+        "management_fee": {
+          "value": null,
+          "page": null
+        },
+        "document_type": {
+          "value": "CAPITAL_CALL",
+          "page": 25
+        }
+      },
+      "sha256": "03cee87ae078ac140e6660b2756f324470e1eacd68c74bc817b92e30222bec8f"
+    },
+    {
+      "file": "pack-10.txt",
+      "source_case": "CC-017",
+      "source": "data/evals/notices/cc-017_wrong_payment_reference.txt",
+      "pages": 32,
+      "decoy_pages": [
+        13
+      ],
+      "gold": {
+        "fund_name": {
+          "value": "Meadowgate Special Situations III",
+          "page": 14
+        },
+        "investor_name": {
+          "value": "Orchard Crown Charitable Reserve",
+          "page": 14
+        },
+        "commitment_amount": {
+          "value": "11000000.00",
+          "page": 14
+        },
+        "capital_call_amount": {
+          "value": "275000.00",
+          "page": 14
+        },
+        "call_date": {
+          "value": "2026-09-04",
+          "page": 15
+        },
+        "due_date": {
+          "value": "2026-09-26",
+          "page": 15
+        },
+        "currency": {
+          "value": "GBP",
+          "page": 15
+        },
+        "bank_account_reference": {
+          "value": "MSS3-OCR-CC06",
+          "page": 15
+        },
+        "management_fee": {
+          "value": null,
+          "page": null
+        },
+        "document_type": {
+          "value": "CAPITAL_CALL",
+          "page": 15
+        }
+      },
+      "sha256": "9a245c632db5c5774c096cee4306f91e97d7316f3939d01552747d24e7553c62"
+    },
+    {
+      "file": "pack-11.txt",
+      "source_case": "CC-018",
+      "source": "data/evals/notices/cc-018_due_date_missing.txt",
+      "pages": 24,
+      "decoy_pages": [],
+      "gold": {
+        "fund_name": {
+          "value": "Crown Mere Technology Fund II",
+          "page": 15
+        },
+        "investor_name": {
+          "value": "Penford Civic Retirement Trust",
+          "page": 15
+        },
+        "commitment_amount": {
+          "value": "8000000.00",
+          "page": 15
+        },
+        "capital_call_amount": {
+          "value": "200000.00",
+          "page": 15
+        },
+        "call_date": {
+          "value": "2026-09-04",
+          "page": 15
+        },
+        "due_date": {
+          "value": null,
+          "page": null
+        },
+        "currency": {
+          "value": "GBP",
+          "page": 15
+        },
+        "bank_account_reference": {
+          "value": "CMT2-PCR-CC04",
+          "page": 15
+        },
+        "management_fee": {
+          "value": null,
+          "page": null
+        },
+        "document_type": {
+          "value": "CAPITAL_CALL",
+          "page": 15
+        }
+      },
+      "sha256": "36b95e43378071fe84361b095ed858de792f1e859788b8f15138c222167956bd"
+    },
+    {
+      "file": "pack-12.txt",
+      "source_case": "CC-019",
+      "source": "data/evals/notices/cc-019_notice_belongs_to_the_wrong_investor.txt",
+      "pages": 37,
+      "decoy_pages": [
+        18
+      ],
+      "gold": {
+        "fund_name": {
+          "value": "Ravenscourt European Buyout VI",
+          "page": 16
+        },
+        "investor_name": {
+          "value": "Brackenmere Staff Pension Trust",
+          "page": 16
+        },
+        "commitment_amount": {
+          "value": "15000000.00",
+          "page": 16
+        },
+        "capital_call_amount": {
+          "value": "375000.00",
+          "page": 16
+        },
+        "call_date": {
+          "value": "2026-09-04",
+          "page": 16
+        },
+        "due_date": {
+          "value": "2026-09-28",
+          "page": 16
+        },
+        "currency": {
+          "value": "GBP",
+          "page": 16
+        },
+        "bank_account_reference": {
+          "value": "REB6-SCF-CC02",
+          "page": 16
+        },
+        "management_fee": {
+          "value": null,
+          "page": null
+        },
+        "document_type": {
+          "value": "CAPITAL_CALL",
+          "page": 16
+        }
+      },
+      "sha256": "c92dfa29d9d3dee818ff0057232ef98c686b496267b3fa2e2001bed916e3fc96"
+    }
+  ]
+}

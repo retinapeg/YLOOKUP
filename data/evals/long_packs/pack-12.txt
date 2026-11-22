@@ -1,0 +1,261 @@
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 1
+
+Valuation committee minutes | Plover Rail
+The committee compared the proposed multiple with the prior valuation and recorded reasons for differences. Follow-up work concerns customer concentration and stock ageing. The draft remains subject to review at the next scheduled meeting.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 2
+
+Glossary | Investor operations
+A capital call is a request under a commitment. A notice normally identifies a due date, currency and payment reference. This glossary explains the terms without specifying an amount due, an investor name or the details of a current transaction.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 3
+
+Quarterly partner letter | Q3
+The operating team visited Fenlight Stores to review order books, maintenance backlogs and supplier lead times. Procurement savings arrived later than budget. The next review will track cancellations separately from orders that moved into the following quarter.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 4
+
+Unaudited portfolio schedule | Q4
+Company | Sales index | Margin index | Prior margin
+Fallowmere Glass | 97 | 117 | 101
+Plover Rail | 98 | 116 | 102
+Ashwater Textiles | 99 | 115 | 103
+Fenlight Stores | 100 | 114 | 104
+Indices use the prior year as a base of 100. These figures aggregate operating companies.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 5
+
+Legal notices | Distribution restrictions
+The quarterly letter is supplied for discussion with existing partners. Estimates and illustrations depend on the assumptions recorded in the schedules. No subscription, payment instruction or amendment takes effect through this exhibit.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 6
+
+Valuation committee minutes | Ashwater Textiles
+The committee compared the proposed multiple with the prior valuation and recorded reasons for differences. Follow-up work concerns customer concentration and stock ageing. The draft remains subject to review at the next scheduled meeting.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 7
+
+Glossary | Investor operations
+A capital call is a request under a commitment. A notice normally identifies a due date, currency and payment reference. This glossary explains the terms without specifying an amount due, an investor name or the details of a current transaction.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 8
+
+Quarterly partner letter | Q4
+The operating team visited Fallowmere Glass to review order books, maintenance backlogs and supplier lead times. Procurement savings arrived later than budget. The next review will track cancellations separately from orders that moved into the following quarter.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 9
+
+Unaudited portfolio schedule | Q1
+Company | Sales index | Margin index | Prior margin
+Fallowmere Glass | 102 | 117 | 101
+Plover Rail | 103 | 116 | 102
+Ashwater Textiles | 104 | 115 | 103
+Fenlight Stores | 105 | 114 | 104
+Indices use the prior year as a base of 100. These figures aggregate operating companies.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 10
+
+Legal notices | Distribution restrictions
+The quarterly letter is supplied for discussion with existing partners. Estimates and illustrations depend on the assumptions recorded in the schedules. No subscription, payment instruction or amendment takes effect through this exhibit.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 11
+
+Valuation committee minutes | Fenlight Stores
+The committee compared the proposed multiple with the prior valuation and recorded reasons for differences. Follow-up work concerns customer concentration and stock ageing. The draft remains subject to review at the next scheduled meeting.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 12
+
+Glossary | Investor operations
+A capital call is a request under a commitment. A notice normally identifies a due date, currency and payment reference. This glossary explains the terms without specifying an amount due, an investor name or the details of a current transaction.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 13
+
+Quarterly partner letter | Q1
+The operating team visited Plover Rail to review order books, maintenance backlogs and supplier lead times. Procurement savings arrived later than budget. The next review will track cancellations separately from orders that moved into the following quarter.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 14
+
+Unaudited portfolio schedule | Q2
+Company | Sales index | Margin index | Prior margin
+Fallowmere Glass | 107 | 117 | 101
+Plover Rail | 108 | 116 | 102
+Ashwater Textiles | 109 | 115 | 103
+Fenlight Stores | 110 | 114 | 104
+Indices use the prior year as a base of 100. These figures aggregate operating companies.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 15
+
+Legal notices | Distribution restrictions
+The quarterly letter is supplied for discussion with existing partners. Estimates and illustrations depend on the assumptions recorded in the schedules. No subscription, payment instruction or amendment takes effect through this exhibit.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+Ravenscourt European Buyout VI
+CAPITAL CALL NOTICE
+Notice ID: CC-019-NOTICE-A
+
+Fund Name: Ravenscourt European Buyout VI
+Investor Name: Brackenmere Staff Pension Trust
+Commitment Amount: GBP 15,000,000.00
+Capital Call Amount: GBP 375,000.00
+Call Date: 2026-09-04
+Due Date: 2026-09-28
+Currency: GBP
+Payment Reference: REB6-SCF-CC02
+Document Type: Capital Call
+
+Operational context
+Fund and amount happen to agree, but the notice is addressed to a different institutional LP.
+
+Payment control
+No bank account or routing coordinates are present in this synthetic fixture.
+FICTIONAL - DEMO ONLY - DO NOT PAY
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 17
+
+Glossary | Investor operations
+A capital call is a request under a commitment. A notice normally identifies a due date, currency and payment reference. This glossary explains the terms without specifying an amount due, an investor name or the details of a current transaction.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Archived example — superseded notice for comparison only.
+FICTIONAL - DEMO ONLY - DO NOT PAY
+
+NORTHSTAR GROWTH FUND II
+CAPITAL CALL NOTICE - CALL 04
+
+Document Type: Capital Call
+Fund Name: Northstar Growth Fund II
+Investor Name: Albion Capital Partners
+Commitment Amount: GBP 5,000,000.00
+Capital Call Amount: GBP 650,000.00
+Management Fee: GBP 25,000.00
+Call Date: 2026-09-04
+Due Date: 2026-09-20
+Currency: GBP
+Payment Reference: NSGFII-ALB-CC04
+
+Purpose of call
+The drawdown will fund approved portfolio investments, operating reserves, and the
+management fee stated above. Operations should compare this notice with the
+administrator record before any review decision is recorded.
+
+Payment control
+This synthetic notice contains no bank account or routing details. It is not a
+payment instruction and cannot be used to transfer funds.
+
+FICTIONAL - DEMO ONLY - DO NOT PAY
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 19
+
+Unaudited portfolio schedule | Q3
+Company | Sales index | Margin index | Prior margin
+Fallowmere Glass | 112 | 117 | 101
+Plover Rail | 113 | 116 | 102
+Ashwater Textiles | 114 | 115 | 103
+Fenlight Stores | 115 | 114 | 104
+Indices use the prior year as a base of 100. These figures aggregate operating companies.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 20
+
+Legal notices | Distribution restrictions
+The quarterly letter is supplied for discussion with existing partners. Estimates and illustrations depend on the assumptions recorded in the schedules. No subscription, payment instruction or amendment takes effect through this exhibit.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 21
+
+Valuation committee minutes | Plover Rail
+The committee compared the proposed multiple with the prior valuation and recorded reasons for differences. Follow-up work concerns customer concentration and stock ageing. The draft remains subject to review at the next scheduled meeting.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 22
+
+Glossary | Investor operations
+A capital call is a request under a commitment. A notice normally identifies a due date, currency and payment reference. This glossary explains the terms without specifying an amount due, an investor name or the details of a current transaction.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 23
+
+Quarterly partner letter | Q3
+The operating team visited Fenlight Stores to review order books, maintenance backlogs and supplier lead times. Procurement savings arrived later than budget. The next review will track cancellations separately from orders that moved into the following quarter.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 24
+
+Unaudited portfolio schedule | Q4
+Company | Sales index | Margin index | Prior margin
+Fallowmere Glass | 117 | 117 | 101
+Plover Rail | 118 | 116 | 102
+Ashwater Textiles | 119 | 115 | 103
+Fenlight Stores | 120 | 114 | 104
+Indices use the prior year as a base of 100. These figures aggregate operating companies.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 25
+
+Legal notices | Distribution restrictions
+The quarterly letter is supplied for discussion with existing partners. Estimates and illustrations depend on the assumptions recorded in the schedules. No subscription, payment instruction or amendment takes effect through this exhibit.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 26
+
+Valuation committee minutes | Ashwater Textiles
+The committee compared the proposed multiple with the prior valuation and recorded reasons for differences. Follow-up work concerns customer concentration and stock ageing. The draft remains subject to review at the next scheduled meeting.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 27
+
+Glossary | Investor operations
+A capital call is a request under a commitment. A notice normally identifies a due date, currency and payment reference. This glossary explains the terms without specifying an amount due, an investor name or the details of a current transaction.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 28
+
+Quarterly partner letter | Q4
+The operating team visited Fallowmere Glass to review order books, maintenance backlogs and supplier lead times. Procurement savings arrived later than budget. The next review will track cancellations separately from orders that moved into the following quarter.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 29
+
+Unaudited portfolio schedule | Q1
+Company | Sales index | Margin index | Prior margin
+Fallowmere Glass | 122 | 117 | 101
+Plover Rail | 123 | 116 | 102
+Ashwater Textiles | 124 | 115 | 103
+Fenlight Stores | 125 | 114 | 104
+Indices use the prior year as a base of 100. These figures aggregate operating companies.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 30
+
+Legal notices | Distribution restrictions
+The quarterly letter is supplied for discussion with existing partners. Estimates and illustrations depend on the assumptions recorded in the schedules. No subscription, payment instruction or amendment takes effect through this exhibit.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 31
+
+Valuation committee minutes | Fenlight Stores
+The committee compared the proposed multiple with the prior valuation and recorded reasons for differences. Follow-up work concerns customer concentration and stock ageing. The draft remains subject to review at the next scheduled meeting.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 32
+
+Glossary | Investor operations
+A capital call is a request under a commitment. A notice normally identifies a due date, currency and payment reference. This glossary explains the terms without specifying an amount due, an investor name or the details of a current transaction.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 33
+
+Quarterly partner letter | Q1
+The operating team visited Plover Rail to review order books, maintenance backlogs and supplier lead times. Procurement savings arrived later than budget. The next review will track cancellations separately from orders that moved into the following quarter.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 34
+
+Unaudited portfolio schedule | Q2
+Company | Sales index | Margin index | Prior margin
+Fallowmere Glass | 127 | 117 | 101
+Plover Rail | 128 | 116 | 102
+Ashwater Textiles | 129 | 115 | 103
+Fenlight Stores | 130 | 114 | 104
+Indices use the prior year as a base of 100. These figures aggregate operating companies.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 35
+
+Legal notices | Distribution restrictions
+The quarterly letter is supplied for discussion with existing partners. Estimates and illustrations depend on the assumptions recorded in the schedules. No subscription, payment instruction or amendment takes effect through this exhibit.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 36
+
+Valuation committee minutes | Fallowmere Glass
+The committee compared the proposed multiple with the prior valuation and recorded reasons for differences. Follow-up work concerns customer concentration and stock ageing. The draft remains subject to review at the next scheduled meeting.
+SYNTHETIC TRAINING PACK — FICTIONAL — DO NOT PAY
+Reporting packet 12 · folio 37
+
+Glossary | Investor operations
+A capital call is a request under a commitment. A notice normally identifies a due date, currency and payment reference. This glossary explains the terms without specifying an amount due, an investor name or the details of a current transaction.
